@@ -5,7 +5,7 @@ import json
 class node():
 
     # init method or constructor
-    def __init__(self, ip_port, boot_ip, k, reptype):
+    def __init__(self, ip_port, boot_ip, k=1, reptype="None"):
         self.ip_port:str=ip_port
         self.boot_ip_port:str=boot_ip
         self.prev_ip_port:str=ip_port
@@ -14,6 +14,7 @@ class node():
         self.keys_vals={}
         self.replicas = k
         self.rep_type = reptype
+        self.isInChord = False
 
     def get_rep_type(self):
         # Getter for replication type
@@ -22,6 +23,10 @@ class node():
     def get_replicas(self):
         # Getter for number of replicas
         return self.replicas
+
+    def get_isInChord(self):
+        #Getter for isInChord variable
+        return self.isInChord
 
     def hash(self,text):
         hash_object = hashlib.sha1(text.encode())
@@ -82,6 +87,11 @@ class node():
         if succ_ip_port != "None":
             self.succ_ip_port= succ_ip_port
 
+    def join_set_vars(self, repn, rep_type):
+        self.replicas = repn
+        self.rep_type = rep_type
+        self.isInChord = True
+
     def rem_ret_betw_keys(self,id1,id2):
         betw_keys={}
         new_keys_vals={}
@@ -116,11 +126,12 @@ class node():
             return False
 
     def init_state(self):
-        # na ksanarxikopoiw edw tis times twn rep
         self.prev_ip_port: str =self.ip_port
         self.succ_ip_port: str = self.ip_port
         self.keys_vals = {}
-
+        self.replicas = 1
+        self.rep_type = "None"
+        self.isInChord = False
 
     def return_node_stats(self):
         msg=f"IP:{self.ip_port}\n ID:{self.id}\n Prev_IP:{ self.prev_ip_port}\n Next_IP:{ self.succ_ip_port}\n Boot_IP:{self.boot_ip_port}\n Hashtable:{json.dumps(self.keys_vals)}\n"

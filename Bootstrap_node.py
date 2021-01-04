@@ -374,6 +374,7 @@ def ntwreq():
                 post_req_thread(node.succ_ip_port, req_dict)
         else:
             # only join function here, not set already
+            post_resp_to(source, {'type': 'join_vars', 'repn': node.get_replicas(), 'rep_type': node.get_rep_type()})
             if is_responsible(data.get('key')):
                 # do actions, make response , post it to source /ntwresp
                 # take_action(req_dict) -> do actions and return new_data
@@ -487,7 +488,7 @@ def ntwreq():
                 print(f"I AM POSTING THE SAME REQ:{req_dict} TO NEXT NODE\n")
                 post_req_thread(node.succ_ip_port, req_dict)
         else:
-            #KANE ENA POST STHN PHGH KAI STEILE TO K KAI TO REP_TYPE
+            post_resp_to(source, {'type': 'join_vars', 'repn': node.get_replicas(), 'rep_type': node.get_rep_type()})
             # only join function here, not set already
             if is_responsible(data.get('key')):
                 # do actions, make response , post it to source /ntwresp

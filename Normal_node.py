@@ -18,14 +18,13 @@ from colorama import Fore, Style
 app = Flask(__name__)
 ip_port=sys.argv[1]
 boot_ip_port=sys.argv[2]
-replicas = sys.argv[3] # pairnei to plithos twn replicas
-rep_type = sys.argv[4] # pairnei ton typo rep pou tha xrisimopoihthei (dekta mono ta : "linearizability", "eventual")
+
 #THIS IS HOST AND PORT FOR A NORMAL NODE
 host_port=ip_port.split(":")
 host=host_port[0]
 port=host_port[1]
 # construct node
-node=node(ip_port,boot_ip_port, replicas, rep_type)
+node=node(ip_port,boot_ip_port)
 
 responses_dict={}
 #istoriko twn request kai responses gia ta antistoixa seqn
@@ -159,7 +158,9 @@ def handle_response(resp):
             #update prev next and keys
             node.set_neighboors(data['prev'],data['succ'])
             node.keys_vals=data['keys_vals']
-            msg=f"Node {node.id}:[{node.ip_port}] joined the Chord!\n"
+            repn = node.get_replicas()
+            rep_type = node.get_rep_type()
+            msg=f"Node {node.id}:[{node.ip_port}] joined the Chord with replication type {rep_type} and {repn} replicas!\n"
     return msg
 
 @app.route('/', methods=['POST', 'GET'])
@@ -176,6 +177,7 @@ def func1():
 @app.route('/insert', methods=['POST'])
 def insert():
     if request.method == 'POST':
+
         global seqn
         seqn = seqn + 1
         req_code = str(seqn)
@@ -244,36 +246,39 @@ def delete():
 def depart():
 
     if request.method == 'POST':
-        global seqn
-        seqn=seqn+1
-        req_code=str(seqn)
 
-        data={'keys_vals':node.keys_vals, 'prev':node.prev_ip_port, 'succ':node.succ_ip_port}
-        if node.is_alone():
-            node.init_state()
-            return f"Node {node.ip_port} departed from the Chord!\n"
+        if not node.get_isInChord():
+            msg = 'This node does not participate in Chord!\n'
         else:
-            req=make_req('depart',data,req_code)
-            if not node.is_duo():
-                # an exoume >=2 nodes sto chord mono tote stelnoume 2 post , alliws stelnoume mono1 kai pernoyme pali 2 responses
-                post_req_thread(node.prev_ip_port, req)
-            post_req_thread(node.succ_ip_port, req)
-            # w8 till we have prev and succ responses (codes-> req_code+_prev/_succ) then pop and handle both
-            prev_code=req_code+'_prev'
-            succ_code=req_code+'_succ'
-            while responses_dict.get(prev_code,"None")=="None":
-                {}
-            while responses_dict.get(succ_code, "None")=="None":
-                {}
-            # pop response from dict and handle it
-            resp_prev=responses_dict.pop(prev_code)
-            resp_succ=responses_dict.pop(succ_code)
-            msg1=handle_response(resp_prev)
-            msg2=handle_response(resp_succ)
-            node.init_state()
-            return msg1+msg2
+            global seqn
+            seqn=seqn+1
+            req_code=str(seqn)
 
-
+            data={'keys_vals':node.keys_vals, 'prev':node.prev_ip_port, 'succ':node.succ_ip_port}
+            if node.is_alone():
+                node.init_state()
+                return f"Node {node.ip_port} departed from the Chord!\n"
+            else:
+                req=make_req('depart',data,req_code)
+                if not node.is_duo():
+                    # an exoume >=2 nodes sto chord mono tote stelnoume 2 post , alliws stelnoume mono1 kai pernoyme pali 2 responses
+                    post_req_thread(node.prev_ip_port, req)
+                post_req_thread(node.succ_ip_port, req)
+                # w8 till we have prev and succ responses (codes-> req_code+_prev/_succ) then pop and handle both
+                prev_code=req_code+'_prev'
+                succ_code=req_code+'_succ'
+                while responses_dict.get(prev_code,"None")=="None":
+                    {}
+                while responses_dict.get(succ_code, "None")=="None":
+                    {}
+                # pop response from dict and handle it
+                resp_prev=responses_dict.pop(prev_code)
+                resp_succ=responses_dict.pop(succ_code)
+                msg1=handle_response(resp_prev)
+                msg2=handle_response(resp_succ)
+                msg = msg1+msg2
+                node.init_state()
+        return msg
 
 @app.route('/overlay', methods=['POST'])
 def overlay():
@@ -296,7 +301,10 @@ def overlay():
 
 @app.route('/join',methods=['POST'])
 def call_join():
-    msg=join()
+    if node.get_isInChord():
+        msg = 'This node is already in Chord!\n'
+    else:
+        msg=join()
     return msg
 
 @app.route('/show_info', methods=['POST'])
@@ -305,7 +313,6 @@ def show_info():
 
 def join():
     # its important to stall join request so that our server has started properly and then we can get the boot server response
-
 
     global seqn
     seqn=seqn+1
@@ -332,7 +339,6 @@ def ntwreq():
 
     source=req_dict['source']
     req_type=req_dict['type']
-    # to data apotelei dict keys:values opou keys oi metavlites kai values oi times tous
     data=req_dict['data']
     req_code=req_dict['seqn']
 
@@ -548,13 +554,16 @@ def ntwreq():
 
 @app.route('/ntwresp',methods=['POST'])
 def ntwresp():
-    #FTIAXNW KAINOURIO TYPE join_vars KAI EKEI ENHMERWNW TO K KAI TO REP_TYPE
     resp_dict=json.loads(request.data)
 
     if resp_dict['type']=='set_neighboors':
         prev_ip_port=resp_dict['prev']
         succ_ip_port=resp_dict['succ']
         node.set_neighboors(prev_ip_port,succ_ip_port)
+    elif resp_dict['type']=='join_vars':
+        repn = resp_dict['repn']
+        rep_type = resp_dict['rep_type']
+        node.join_set_vars(repn, rep_type)
     else:
         seqn=resp_dict['seqn']
         responses_dict[seqn]=resp_dict
