@@ -14,7 +14,6 @@ from colorama import Fore, Style
 # 3)make request/response logs
 # 6) !!! debugging !!!
 
-
 app = Flask(__name__)
 ip_port = sys.argv[1]
 replicas = sys.argv[3] # pairnei to plithos twn replicas
@@ -25,7 +24,7 @@ host_port = ip_port.split(":")
 host = host_port[0]
 port = host_port[1]
 # construct node
-node = node(ip_port, boot_ip_port, replicas, rep_type)
+node = node(ip_port, boot_ip_port, replicas, rep_type, True)
 
 responses_dict = {}
 # istoriko twn request kai responses gia ta antistoixa seqn
@@ -111,8 +110,9 @@ def take_action(req_dict):
     data = req_dict['data']
     key = data['key']
     if req_type == 'insert':
+        repn = int(node.get_replicas()) - int(data['repn'])
         value = data['value']
-        msg = node.insert(key, value)
+        msg = node.insert(key, value, repn)
         new_data = {'key': key, 'value': value, 'repn': data['repn'], 'resp_text': msg}
 
     elif req_type == 'query':
@@ -535,7 +535,6 @@ def is_responsible(key):
         else:
             return False
 
-
 if __name__ == '__main__':
     # run join func via a thread so that the server will have begun when we get the response!!!!
     # if we dont use thread the response comes but the server hasnt started yet so it doesnt accept it
@@ -544,5 +543,4 @@ if __name__ == '__main__':
     # thread.start()
     join()
     app.run(host=host, port=port, debug=True)
-
 

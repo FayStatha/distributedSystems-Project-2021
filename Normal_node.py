@@ -107,7 +107,8 @@ def take_action(req_dict):
     key = data['key']
     if req_type == 'insert':
         value = data['value']
-        msg = node.insert(key, value)
+        repn = int(node.get_replicas()) - int(data['repn'])
+        msg = node.insert(key, value, repn)
         new_data = {'key': key, 'value': value, 'repn': data['repn'], 'resp_text': msg}
 
     elif req_type == 'query':
@@ -157,7 +158,7 @@ def handle_response(resp):
         elif resp_type== 'join':
             #update prev next and keys
             node.set_neighboors(data['prev'],data['succ'])
-            node.keys_vals=data['keys_vals']
+            node.keys_vals[0]=data['keys_vals']
             repn = node.get_replicas()
             rep_type = node.get_rep_type()
             msg=f"Node {node.id}:[{node.ip_port}] joined the Chord with replication type {rep_type} and {repn} replicas!\n"
@@ -254,7 +255,7 @@ def depart():
             seqn=seqn+1
             req_code=str(seqn)
 
-            data={'keys_vals':node.keys_vals, 'prev':node.prev_ip_port, 'succ':node.succ_ip_port}
+            data={'keys_vals':node.keys_vals[0], 'prev':node.prev_ip_port, 'succ':node.succ_ip_port}
             if node.is_alone():
                 node.init_state()
                 return f"Node {node.ip_port} departed from the Chord!\n"
