@@ -34,8 +34,8 @@ A project for Distributed Systems course at NTUA, ECE, academic year 2020-2021.
 
 ### Fire up Bootstrap Node
 
-``python3 Bootstrap_node.py bootstrap_ip bootstrap_ip number_of_replicas type_of_consistency```
+```python3 Bootstrap_node.py bootstrap_ip bootstrap_ip number_of_replicas type_of_consistency```
 
 ### Fire up Nodes
 
-``python3 Bootstrap_node.py bootstrap_ip node_ip```
+```python3 Bootstrap_node.py bootstrap_ip node_ip```
