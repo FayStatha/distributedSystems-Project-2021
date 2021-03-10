@@ -10,7 +10,7 @@ A project for Distributed Systems course at NTUA, ECE, academic year 2020-2021.
 
 ### Install python3.8
 
-```sudo apt install python3.8```
+```sudo apt install python3```
 
 ### Install pip3
 

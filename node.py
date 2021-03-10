@@ -16,8 +16,8 @@ class node():
         self.rep_type = reptype
         self.isInChord = False
         if isBootstrap:
-        	for i in range(int(k)):
-        		self.keys_vals.append({})
+            for i in range(int(k)):
+                self.keys_vals.append({})
 
     def get_rep_type(self):
         # Getter for replication type
@@ -41,12 +41,12 @@ class node():
         return id
 
     def has_key(self, key):
-    	for data_dict in self.keys_vals:
-    		if data_dict.get(key, "None") == "None":
-    			continue
-    		else:
-    			return True
-    	return False
+        for data_dict in self.keys_vals:
+            if data_dict.get(key, "None") == "None":
+                continue
+            else:
+                return True
+        return False
 
     def insert(self, key, val, repn):
         # returns pair inserted or updated if it already existed
@@ -59,26 +59,26 @@ class node():
         return msg
 
     def query(self, key):
-    	for data_dict in self.keys_vals:
-    		x = data_dict.get(key, "None")
-    		if x == "None":
-    			continue
-    		else:
-    			msg = f"The {key} corresponds to the value:{x}\n"
-    			return msg
-    	msg = f"The key:{key} was not found\n"
-    	return msg
+        for data_dict in self.keys_vals:
+            x = data_dict.get(key, "None")
+            if x == "None":
+                continue
+            else:
+                msg = f"The {key} corresponds to the value:{x}\n"
+                return msg
+        msg = f"The key:{key} was not found\n"
+        return msg
 
     def delete(self,key):
-    	for data_dict in self.keys_vals:
-    		x= data_dict.pop(key, "None")
-    		if x == "None":
-    			continue
-    		else:
-    			msg=f"Pair {key}:{x} deleted succesfully!\n"
-    			return msg
-    	msg=f"Key:{key} doesn't exist, hence cant be deleted\n"
-    	return msg
+        for data_dict in self.keys_vals:
+            x= data_dict.pop(key, "None")
+            if x == "None":
+                continue
+            else:
+                msg=f"Pair {key}:{x} deleted succesfully!\n"
+                return msg
+        msg=f"Key:{key} doesn't exist, hence cant be deleted\n"
+        return msg
 
     def is_next(self,source_ip_port):
         if self.prev_ip_port == source_ip_port:
@@ -103,11 +103,11 @@ class node():
         self.rep_type = rep_type
         self.isInChord = True
         for i in range(int(repn)):
-        	self.keys_vals.append({})
+            self.keys_vals.append({})
 
     def rem_ret_betw_keys(self,id1,id2):
 
-    	# need to change
+        # need to change
 
         betw_keys={}
         new_keys_vals={}
@@ -151,13 +151,7 @@ class node():
 
     def return_node_stats(self):
 
-    	#SOS TO HASHTABLE EDW DEN KSERW PWS NA TO FTIAKSW
+        #SOS TO HASHTABLE EDW DEN KSERW PWS NA TO FTIAKSW
 
         msg=f"IP:{self.ip_port}\n ID:{self.id}\n Prev_IP:{ self.prev_ip_port}\n Next_IP:{ self.succ_ip_port}\n Boot_IP:{self.boot_ip_port}\n Hashtable:{json.dumps(self.keys_vals)}\n"
         return msg
-
-
-
-
-
-
