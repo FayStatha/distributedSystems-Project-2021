@@ -88,19 +88,26 @@ def make_new_data(req_dict):
     new_data = {}
     req_type = req_dict['type']
     data = req_dict['data']
-    key = data['key']
+
     if req_type == 'insert':
         value = data['value']
+        key = data['key']
         rep_number = int(data['repn']) - 1
         new_data = {'key': key, 'value': value, 'repn': rep_number}
 
     elif req_type == 'query':
-        rep_number = int(data['repn']) - 1
-        new_data = {'key': key, 'repn': rep_number}
+    	key = data['key']
+    	rep_number = int(data['repn']) - 1
+    	new_data = {'key': key, 'repn': rep_number}
 
     elif req_type == 'delete':
+    	key = data['key']
+    	rep_number = int(data['repn']) - 1
+    	new_data = {'key': key, 'repn': rep_number}
+
+    elif req_type == 'insert_rep':
         rep_number = int(data['repn']) - 1
-        new_data = {'key': key, 'repn': rep_number}
+        new_data = {'keys_vals':data['keys_vals'], 'first': False, 'repn':rep_number, 'rep_code': data['rep_code']}
 
     return new_data
 
@@ -304,43 +311,73 @@ def ntwreq():
     req_code = req_dict['seqn']
 
     if node.get_rep_type() == "eventual":
-        if req_type == 'depart':
-            print("I am Bootstrap:", node.ip_port, "and I am about to take the data")
-            # για κάθε δεδομένο που πήρα από τον προηγούμενο node, πρέπει να τρέξω και μία insert.
-            for a in data['keys_vals']:
-                # μορφοποιώ αρχικά τα δεδομένα στη μορφή που θα τα δεχτεί το take_action
-                key = a
-                value = data['keys_vals'][a]
-                req_dict['data'] = {'key': key, 'value': value, 'repn': 1}
-                req_dict['type'] = 'insert'
-                # εκτελώ την take_action τόσες φορές όσα τα στοιχεία του keys_vals
-                # όσα δηλαδή τα στοιχεία του node, που πρόκεται να διαγραφεί.
-                new_data = take_action(req_dict)
-                resp=make_resp(source,req_type,new_data,req_code)
+
+        if req_type == 'insert_rep':
+
+            if int(data.get('repn')) == int(node.get_replicas()) or data.get('first'):
+                # do actions, make response , post it to source /ntwresp
+                # take_action(req_dict) -> do actions and return new_data
+                index = int(node.get_replicas()) - int(data.get('repn'))
+
+                node.keys_vals[index].update(data['keys_vals'])
+
+                if index+1 < int(node.get_replicas()):
+                    node.delete_same_keys(index+1, data['keys_vals'])
+
+                resp_code = data.get('rep_code')
+                resp_text = "Data for "+resp_code+" updated!\n"
+                resp_data = {'sender_ip_port': node.ip_port, 'resp_text': resp_text}
+                resp = make_resp(source, req_type, resp_data, resp_code)
+                print(f"I AM POSTING THE RESPONSE:{resp}")
                 post_resp_thread(source, resp)
-            #     is next or is prev?
-            # is_next-> update prev_ip , update keys_vals with departing nodes'
-            # is_prev -> update next_ip
-            # data={'keys_vals':node.keys_vals, 'prev':node.prev_ip_port, 'succ':node.succ_ip_port}
-            # if node.is_next(source):
-            #     node.set_neighboors(data['prev'], "None")
-            #     # updates keys of this node from the ones from the departing node
-            #     node.keys_vals.update(data['keys_vals'])
 
-            #     resp_data = {'sender_ip_port': node.ip_port, 'resp_text': "next node updated...\n"}
-            #     resp_code = str(req_code) + "_succ"
-            #     resp = make_resp(source, 'depart', resp_data, resp_code)
-            #     post_resp_thread(source, resp)
-            # #     in special cases 1 or 2 nodes on Chord a node could be both succ and prev so we dont use elif
-            # if node.is_prev(source):
-            #     node.set_neighboors("None", data['succ'])
+                if int(node.get_replicas()) != 1:
+                    new_data = make_new_data(req_dict)
+                    new_req = make_same_req(source, req_type, new_data, req_code)
+                    print(f"I AM POSTING THE SAME REQ:{new_req} TO NEXT REPLICA MANAGER\n")
+                    post_req_thread(node.succ_ip_port, new_req)
 
-            #     resp_data = {'sender_ip_port': node.ip_port, 'resp_text': "prev node updated...\n"}
-            #     resp_code = str(req_code) + "_prev"
-            #     resp = make_resp(source, 'depart', resp_data, resp_code)
-            #     post_resp_thread(source, resp)
+            elif 0 < int(data.get('repn')) < int(node.get_replicas()):
+                # at least the responsible server has taken care of the request
+                # replica managers don't send responses
+                index = int(node.get_replicas()) - int(data.get('repn'))
+
+                node.keys_vals[index].update(data['keys_vals'])
+
+                if index+1 < int(node.get_replicas()):
+                    node.delete_same_keys(index+1, data['keys_vals'])
+
+                new_data = make_new_data(req_dict)
+                if int(data.get('repn')) != 1:
+                    new_req = make_same_req(source, req_type, new_data, req_code)
+                    print(f"I AM POSTING THE SAME REQ:{new_req} TO NEXT REPLICA MANAGER\n")
+                    post_req_thread(node.succ_ip_port, new_req)    
+
+        elif req_type== 'depart':
+ 
+            #is next or is prev?
+            #is_next-> update prev_ip , update keys_vals with departing nodes'
+            #is_prev -> update next_ip
+            #data={'prev':node.prev_ip_port, 'succ':node.succ_ip_port}
+
+            if node.is_next(source):
+                node.set_neighboors(data['prev'],"None")
+
+                resp_data={'sender_ip_port':node.ip_port, 'resp_text':"Next node updated...\n"}
+                resp_code=str(req_code)+"_succ"
+                resp=make_resp(source, req_type, resp_data, resp_code)
+                post_resp_thread(source,resp)
+            #  in special cases 1 or 2 nodes on Chord a node could be both succ and prev so we dont use elif
+            if node.is_prev(source):
+                node.set_neighboors("None",data['succ'])
+
+                resp_data = {'sender_ip_port': node.ip_port, 'resp_text': "prev node updated...\n"}
+                resp_code = str(req_code) + "_prev"
+                resp = make_resp(source, req_type, resp_data, resp_code)
+                post_resp_thread(source, resp)
 
         elif req_type == 'overlay':
+
             topology = data['topology']
             element = {'node_id': node.id, 'node_ip_port': node.ip_port}
             topology.append(element)
@@ -355,6 +392,7 @@ def ntwreq():
                 post_req_thread(node.succ_ip_port, req_dict)
 
         elif req_type == 'query':
+
             if is_responsible(data.get('key')) or node.has_key(data.get('key')):
                 # do actions, make response , post it to source /ntwresp
                 # take_action(req_dict) -> do actions and return new_data
@@ -368,6 +406,7 @@ def ntwreq():
                 post_req_thread(node.succ_ip_port, req_dict)
 
         elif req_type == 'insert' or req_type == 'delete':
+
             # insert and delete implementation here
             if is_responsible(data.get('key')):
                 # do actions, make response , post it to source /ntwresp
@@ -396,8 +435,10 @@ def ntwreq():
                 print(f"I AM POSTING THE SAME REQ:{req_dict} TO NEXT NODE\n")
                 post_req_thread(node.succ_ip_port, req_dict)
         else:
+
             # only join function here, not set already
             post_resp_to(source, {'type': 'join_vars', 'repn': node.get_replicas(), 'rep_type': node.get_rep_type()})
+
             if is_responsible(data.get('key')):
                 # do actions, make response , post it to source /ntwresp
                 # take_action(req_dict) -> do actions and return new_data
@@ -412,42 +453,76 @@ def ntwreq():
 
     elif node.get_rep_type() == "linearizability":
 
-        if req_type == 'depart':
-            print("I am Bootstrap:", node.ip_port, "and I am about take the data")
-            # για κάθε δεδομένο που πήρα από τον προηγούμενο node, πρέπει να τρέξω και μία insert.
-            for a in data['keys_vals']:
-                # μορφοποιώ αρχικά τα δεδομένα στη μορφή που θα τα δεχτεί το take_action
-                key = a
-                value = data['keys_vals'][a]
-                req_dict['data'] = {'key': key, 'value': value, 'repn': 1}
-                req_dict['type'] = 'insert'
-                # εκτελώ την take_action τόσες φορές όσα τα στοιχεία του keys_vals
-                # όσα δηλαδή τα στοιχεία του node, που πρόκεται να διαγραφεί.
-                new_data = take_action(req_dict)
-                resp=make_resp(source,req_type,new_data,req_code)
+        if req_type == 'insert_rep':
+
+            if int(data.get('repn')) == int(node.get_replicas()) or data.get('first'):
+                # do actions, make response , post it to source /ntwresp
+                # take_action(req_dict) -> do actions and return new_data
+                index = int(node.get_replicas()) - int(data.get('repn'))
+
+                node.keys_vals[index].update(data['keys_vals'])
+
+                if index+1 < int(node.get_replicas()):
+                    node.delete_same_keys(index+1, data['keys_vals'])
+
+                if int(node.get_replicas()) != 1 and int(data.get('repn')) != 1:
+                    new_data = make_new_data(req_dict)
+                    new_req = make_same_req(source, req_type, new_data, req_code)
+                    print(f"I AM POSTING THE SAME REQ:{new_req} TO NEXT REPLICA MANAGER\n")
+                    post_req_thread(node.succ_ip_port, new_req)
+                else:
+	                resp_code = data.get('rep_code')
+	                resp_text = "Data for "+resp_code+" updated!\n"
+	                resp_data = {'sender_ip_port': node.ip_port, 'resp_text': resp_text}
+	                resp = make_resp(source, req_type, resp_data, resp_code)
+	                print(f"I AM POSTING THE RESPONSE:{resp}")
+	                post_resp_thread(source, resp)
+
+            elif 0 < int(data.get('repn')) < int(node.get_replicas()):
+                # at least the responsible server has taken care of the request
+                # replica managers don't send responses
+                index = int(node.get_replicas()) - int(data.get('repn'))
+
+                node.keys_vals[index].update(data['keys_vals'])
+
+                if index+1 < int(node.get_replicas()):
+                    node.delete_same_keys(index+1, data['keys_vals'])
+
+                new_data = make_new_data(req_dict)
+                if int(data.get('repn')) != 1:
+                    new_req = make_same_req(source, req_type, new_data, req_code)
+                    print(f"I AM POSTING THE SAME REQ:{new_req} TO NEXT REPLICA MANAGER\n")
+                    post_req_thread(node.succ_ip_port, new_req)
+                else:
+                	resp_code = data.get('rep_code')
+	                resp_text = "Data for "+resp_code+" updated!\n"
+	                resp_data = {'sender_ip_port': node.ip_port, 'resp_text': resp_text}
+	                resp = make_resp(source, req_type, resp_data, resp_code)
+	                print(f"I AM POSTING THE RESPONSE:{resp}")
+	                post_resp_thread(source, resp) 
+
+        elif req_type== 'depart':
+ 
+            #is next or is prev?
+            #is_next-> update prev_ip , update keys_vals with departing nodes'
+            #is_prev -> update next_ip
+            #data={'prev':node.prev_ip_port, 'succ':node.succ_ip_port}
+
+            if node.is_next(source):
+                node.set_neighboors(data['prev'],"None")
+
+                resp_data={'sender_ip_port':node.ip_port, 'resp_text':"Next node updated...\n"}
+                resp_code=str(req_code)+"_succ"
+                resp=make_resp(source, req_type, resp_data, resp_code)
+                post_resp_thread(source,resp)
+            #  in special cases 1 or 2 nodes on Chord a node could be both succ and prev so we dont use elif
+            if node.is_prev(source):
+                node.set_neighboors("None",data['succ'])
+
+                resp_data = {'sender_ip_port': node.ip_port, 'resp_text': "prev node updated...\n"}
+                resp_code = str(req_code) + "_prev"
+                resp = make_resp(source, req_type, resp_data, resp_code)
                 post_resp_thread(source, resp)
-            
-            #     is next or is prev?
-            # is_next-> update prev_ip , update keys_vals with departing nodes'
-            # is_prev -> update next_ip
-            # data={'keys_vals':node.keys_vals, 'prev':node.prev_ip_port, 'succ':node.succ_ip_port}
-            # if node.is_next(source):
-            #     node.set_neighboors(data['prev'], "None")
-            #     # updates keys of this node from the ones from the departing node
-            #     node.keys_vals.update(data['keys_vals'])
-
-            #     resp_data = {'sender_ip_port': node.ip_port, 'resp_text': "next node updated...\n"}
-            #     resp_code = str(req_code) + "_succ"
-            #     resp = make_resp(source, 'depart', resp_data, resp_code)
-            #     post_resp_thread(source, resp)
-            # #     in special cases 1 or 2 nodes on Chord a node could be both succ and prev so we dont use elif
-            # if node.is_prev(source):
-            #     node.set_neighboors("None", data['succ'])
-
-            #     resp_data = {'sender_ip_port': node.ip_port, 'resp_text': "prev node updated...\n"}
-            #     resp_code = str(req_code) + "_prev"
-            #     resp = make_resp(source, 'depart', resp_data, resp_code)
-            #     post_resp_thread(source, resp)
 
         elif req_type == 'overlay':
             topology = data['topology']

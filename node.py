@@ -80,6 +80,11 @@ class node():
         msg=f"Key:{key} doesn't exist, hence cant be deleted\n"
         return msg
 
+    def delete_same_keys(self, index, my_dict):
+        data_dict = self.keys_vals[index]
+        for key in my_dict:
+            data_dict.pop(key, "None")
+
     def is_next(self,source_ip_port):
         if self.prev_ip_port == source_ip_port:
             return True
