@@ -164,9 +164,12 @@ def handle_response(resp):
             msg=data['resp_text']
         elif resp_type=='insert_rep':
             msg==data['resp_text']
-        elif resp_type== 'overlay':
-            topology=data['topology']
-            msg="This is the Chord topology:\n"+str(topology)+"\n"
+        elif resp_type == 'overlay':
+            topology = data['topology']
+            msg = "This is the Chord topology:\n" + str(topology)+"\n"
+        elif resp_type == 'qeury_all':
+            pairs = data['key-value pairs']
+            msg = "Those are all key-value pairs in Chord:\n" + str(pairs)+"\n"
         elif resp_type== 'join':
             #update prev next and keys
             node.set_neighboors(data['prev'],data['succ'])
@@ -216,19 +219,26 @@ def insert():
 
 @app.route('/query', methods=['POST'])
 def query():
-
     if request.method == 'POST':
         global seqn
         seqn=seqn+1
         req_code=str(seqn)
 
         request_dict=request.form
-        key=hash(request_dict['key'])
-        rep_number = node.get_replicas()
-        data={'key':key, 'repn': rep_number}
 
-        req=make_req('query',data,req_code)
-        post_req_thread(node.ip_port, req)
+        if request_dict['key'] != '*':
+            
+            key=hash(request_dict['key'])
+            rep_number = node.get_replicas()
+            data={'key':key, 'repn': rep_number}
+
+            req=make_req('query',data,req_code)
+            post_req_thread(node.ip_port, req)
+        else:
+            data={'key-value pairs':[]}
+            req = make_req('qeury_all', data, req_code)
+            post_req_thread(node.succ_ip_port, req)
+            
         while responses_dict.get(req_code,"None")=="None":
             {}
 #       pop response from dict and handle it
@@ -459,6 +469,21 @@ def ntwreq():
                 req_dict['data']=new_data
                 post_req_thread(node.succ_ip_port, req_dict)
 
+        elif req_type == 'qeury_all':
+
+            pairs = data['key-value pairs']
+            element = node.keys_vals[0]
+            pairs.append(element)
+            new_data = {'key-value pairs': pairs}
+            if node.ip_port == source:
+                # post response to this node's /ntwresp
+                resp = make_resp(source, req_type, new_data, req_code)
+                post_resp_thread(source, resp)
+            else:
+                # post request to succ node
+                req_dict['data'] = new_data
+                post_req_thread(node.succ_ip_port, req_dict)
+
         elif req_type == 'query':
 
             if is_responsible(data.get('key')) or node.has_key(data.get('key')):
@@ -591,6 +616,7 @@ def ntwreq():
                 post_resp_thread(source, resp)
 
         elif req_type== 'overlay':
+
             topology = data['topology']
             element = {'node_id': node.id, 'node_ip_port': node.ip_port}
             topology.append(element)
@@ -604,7 +630,23 @@ def ntwreq():
                 req_dict['data']=new_data
                 post_req_thread(node.succ_ip_port, req_dict)
 
+        elif req_type == 'qeury_all':
+
+            pairs = data['key-value pairs']
+            element = node.keys_vals[0]
+            pairs.append(element)
+            new_data = {'key-value pairs': pairs}
+            if node.ip_port == source:
+                # post response to this node's /ntwresp
+                resp = make_resp(source, req_type, new_data, req_code)
+                post_resp_thread(source, resp)
+            else:
+                # post request to succ node
+                req_dict['data'] = new_data
+                post_req_thread(node.succ_ip_port, req_dict)
+
         elif req_type == 'query':
+
             if is_responsible(data.get('key')):
                 if int(node.get_replicas()) != 1:
                     new_data = make_new_data(req_dict)
@@ -633,6 +675,7 @@ def ntwreq():
                 post_req_thread(node.succ_ip_port, req_dict)
 
         elif req_type == 'insert' or req_type == 'delete':
+
             # insert and delete implementation here
             if is_responsible(data.get('key')):
                 # do actions, make response , post it to source /ntwresp
