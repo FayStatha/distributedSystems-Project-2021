@@ -472,7 +472,7 @@ def ntwreq():
         elif req_type == 'query_all':
 
             pairs = data['key-value pairs']
-            element = {node.ip_port:node.keys_vals}
+            element = {node.ip_port: node.keys_vals}
             pairs.append(element)
             new_data = {'key-value pairs': pairs}
             if node.ip_port == source:
