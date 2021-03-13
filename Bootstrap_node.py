@@ -171,7 +171,7 @@ def handle_response(resp):
         elif resp_type == 'overlay':
             topology = data['topology']
             msg = "This is the Chord topology:\n" + str(topology)+"\n"
-        elif resp_type == 'qeury_all':
+        elif resp_type == 'query_all':
             pairs = data['key-value pairs']
             msg = "Those are all key-value pairs in Chord:\n" + str(pairs)+"\n"
             
@@ -236,7 +236,7 @@ def query():
             post_req_thread(node.ip_port, req)
         else:
             data={'key-value pairs':[]}
-            req = make_req('qeury_all', data, req_code)
+            req = make_req('query_all', data, req_code)
             post_req_thread(node.succ_ip_port, req)
             
         while responses_dict.get(req_code,"None")=="None":
@@ -388,10 +388,10 @@ def ntwreq():
                 resp = make_resp(source, req_type, resp_data, resp_code)
                 post_resp_thread(source, resp)
 
-        elif req_type == 'qeury_all':
+        elif req_type == 'query_all':
 
             pairs = data['key-value pairs']
-            element = node.keys_vals[0]
+            element = {node.ip_port: node.keys_vals}
             pairs.append(element)
             new_data = {'key-value pairs': pairs}
             if node.ip_port == source:
@@ -566,10 +566,10 @@ def ntwreq():
                 req_dict['data'] = new_data
                 post_req_thread(node.succ_ip_port, req_dict)
 
-        elif req_type == 'qeury_all':
+        elif req_type == 'query_all':
 
             pairs = data['key-value pairs']
-            element = node.keys_vals[0]
+            element = {node.ip_port : node.keys_vals[0]}
             pairs.append(element)
             new_data = {'key-value pairs': pairs}
             if node.ip_port == source:
