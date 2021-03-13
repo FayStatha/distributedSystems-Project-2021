@@ -8,6 +8,22 @@ def random_select():
 
 	return random.choice(my_list)
 
+def my_insert(key, value, node = None):
+    if node != None:
+    	ip = node
+    else:
+    	ip = random_select()
+    r = requests.post('http://'+ip+'/insert', data = { 'key':key, 'value':value })
+    print(r.text)	
+
+def my_query(key, node = None):
+    if node != None:
+    	ip = node
+    else:
+    	ip = random_select()
+    r = requests.post('http://'+ip+'/query', data = { 'key':key })
+    print(r.text)		
+
 @click.group()
 def main():
     """A CLI for Chord users!"""
@@ -21,14 +37,10 @@ def insert(**kwargs):
     """Insert given key-value pair in Chord!"""
     key = kwargs['key']
     value = kwargs['value']
+    node = kwargs['node']
 
-    if kwargs['node'] != None:
-    	ip = kwargs['node']
-    else:
-    	ip = random_select()
-    r = requests.post('http://'+ip+'/insert', data = { 'key':key, 'value':value })
-    print(r.text)
-    
+    my_insert(key, value, node)
+
     pass
 
 @main.command()
@@ -52,14 +64,17 @@ def delete(**kwargs):
 def query(**kwargs):
     """Find the key-value pair for given key"""
     key = kwargs['key']
+    node = kwargs['node']
 
+    my_query(key, node)
+    '''
     if kwargs['node'] != None:
     	ip = kwargs['node']
     else:
     	ip = random_select()
     r = requests.post('http://'+ip+'/query', data = { 'key':key })
     print(r.text)
-
+	'''
     pass
 
 @main.command()
@@ -93,6 +108,53 @@ def overlay(**kwargs):
     print(r.text)
 
     pass
+
+@main.command()
+@click.argument('file_path', required = True)
+@click.option('--request_type',
+              type=click.Choice(['insert', 'query', 'mix'], case_sensitive=False))
+def file(**kwargs):
+	"""Send requests with input from a file"""
+
+	# Using readlines()
+	file = kwargs['file_path']
+	file1 = open(file, 'r')
+	Lines = file1.readlines()
+
+	if kwargs['request_type'] == 'insert':
+		
+		# Strips the newline character
+		for line in Lines:
+		    line_list = line.strip().split(',')
+		    key = line_list[0]
+		    value = line_list[1]
+		    my_insert(key, value)
+
+	elif kwargs['request_type'] == 'query':
+		
+		# Strips the newline character
+		for line in Lines:
+		    line_list = line.strip().split(',')
+		    key = line_list[0]
+		    my_query(key)
+
+	elif kwargs['request_type'] == 'mix':
+
+		for line in Lines:
+		    line_list = line.strip().split(',')
+		    req_type = line_list[0]
+		    key = line_list[1]
+
+		    if req_type == 'insert':
+
+		    	value = line_list[2]
+		    	my_insert(key, value)
+
+		    elif req_type == 'query':
+
+		    	my_query(key)		
+
+
 
 if __name__ == '__main__':
     args = sys.argv
