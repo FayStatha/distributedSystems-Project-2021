@@ -316,14 +316,13 @@ def depart():
                  # pop response from dict and handle it
                 resp_prev=responses_dict.pop(prev_code)
                 resp_succ=responses_dict.pop(succ_code)
-                msg1=handle_response(resp_prev)
-                msg2=handle_response(resp_succ)
-                msg = msg1+msg2
-
+                handle_response(resp_prev)
+                handle_response(resp_succ)
+                
                 # Then return the node to dafault state
                 node.init_state()
 
-        return msg
+        return f"Node {node.ip_port} successfully departed from Chord!\n"
 
 
 @app.route('/overlay', methods=['POST'])
