@@ -1,10 +1,12 @@
-import requests, random, re, sys, click
+import requests, random, re, sys, click, time
 
+# random select, selects randomly an online node to send the request
+# all our nodes have ips: serverX:port
 
 def random_select():
-	r = requests.post('http://127.0.0.1:5000/overlay')
+	r = requests.post('http://server1:5000/overlay')
 	data = '['+r.text.split('[')[1]
-	my_list = re.findall("127.{11}", data)
+	my_list = re.findall("server.{6}", data)
 
 	return random.choice(my_list)
 
@@ -116,43 +118,61 @@ def overlay(**kwargs):
 def file(**kwargs):
 	"""Send requests with input from a file"""
 
-	# Using readlines()
+	count = 0
+
 	file = kwargs['file_path']
 	file1 = open(file, 'r')
 	Lines = file1.readlines()
 
 	if kwargs['request_type'] == 'insert':
 		
-		# Strips the newline character
+		start = time.time()
+
 		for line in Lines:
-		    line_list = line.strip().split(',')
-		    key = line_list[0]
-		    value = line_list[1]
-		    my_insert(key, value)
+			count += 1
+			line_list = line.strip().split(',')
+			key = line_list[0]
+			value = line_list[1]
+			my_insert(key, value)
+
+		end = time.time()
 
 	elif kwargs['request_type'] == 'query':
 		
-		# Strips the newline character
+		start = time.time()
+
 		for line in Lines:
-		    line_list = line.strip().split(',')
-		    key = line_list[0]
-		    my_query(key)
+			count += 1
+			line_list = line.strip().split(',')
+			key = line_list[0]
+			my_query(key)
+
+		end = time.time()
 
 	elif kwargs['request_type'] == 'mix':
 
+		start = time.time()
+
 		for line in Lines:
-		    line_list = line.strip().split(',')
-		    req_type = line_list[0]
-		    key = line_list[1]
+			count += 1
+			line_list = line.strip().split(',')
+			req_type = line_list[0]
+			key = line_list[1]
 
-		    if req_type == 'insert':
+			if req_type == 'insert':
 
-		    	value = line_list[2]
-		    	my_insert(key, value)
+				value = line_list[2]
+				my_insert(key, value)
 
-		    elif req_type == 'query':
+			elif req_type == 'query':
 
-		    	my_query(key)		
+				my_query(key)
+
+			end = time.time()
+
+	throughput = count/(end-start)
+
+	print("Throuput of Chord = %.4f requests/second"%throughput)
 
 
 
