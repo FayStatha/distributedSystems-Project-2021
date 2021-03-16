@@ -25,7 +25,7 @@ class node():
 
     def get_replicas(self):
         # Getter for number of replicas
-        return self.replicas
+        return int(self.replicas)
 
     def get_isInChord(self):
         #Getter for isInChord variable
@@ -59,15 +59,15 @@ class node():
         return msg
 
     def query(self, key):
+        #epistrefei to value an vrethei alliws "None"
+        x="None"
         for data_dict in self.keys_vals:
             x = data_dict.get(key, "None")
             if x == "None":
                 continue
             else:
-                msg = f"The {key} corresponds to the value:{x}\n"
-                return msg
-        msg = f"The key:{key} was not found\n"
-        return msg
+                return x
+        return x
 
     def delete(self,key):
         for data_dict in self.keys_vals:
@@ -79,11 +79,6 @@ class node():
                 return msg
         msg=f"Key:{key} doesn't exist, hence cant be deleted\n"
         return msg
-
-    def delete_same_keys(self, index, my_dict):
-        data_dict = self.keys_vals[index]
-        for key in my_dict:
-            data_dict.pop(key, "None")
 
     def is_next(self,source_ip_port):
         if self.prev_ip_port == source_ip_port:
@@ -110,29 +105,47 @@ class node():
         for i in range(int(repn)):
             self.keys_vals.append({})
 
-    def rem_ret_betw_keys(self,id1,id2):
-
-        # need to change
-
-        betw_keys={}
-        new_keys_vals={}
+    def get_same_new_keys(self,key):
+        #computes and returns [same_keys,new_keys]
+        same_keys={}
+        new_keys={}
+        id1=key
+        id2=self.id
         # special case which needs or
-        if id1>id2:
-            for k,v in self.keys_vals[0].items():
-                if (k>id1 or k<=id2):
-                    betw_keys[k]=v
+        if id1 > id2:
+            for k, v in self.keys_vals[0].items():
+                if (k > id1 or k <= id2):
+                    same_keys[k] = v
                 else:
-                    new_keys_vals[k]=[v]
-        #in this case we need and
+                    new_keys[k] = v
+        # in this case we need and
         else:
-            for k,v in self.keys_vals[0].items():
-                if (k>id1 and k<=id2):
-                    betw_keys[k]=v
+            for k, v in self.keys_vals[0].items():
+                if (k > id1 and k <= id2):
+                    same_keys[k] = v
                 else:
-                    new_keys_vals[k]=[v]
+                    new_keys[k] = v
+        return same_keys,new_keys
 
-        self.keys_vals[0]=new_keys_vals
-        return betw_keys
+    def pushdown(self,index):
+        #pushdown all dicts of keys   index-1-->index , index-->index+1 ,...  , k-2-->k-1
+        # index values >0  and <k
+        if (index<=0 or index>=k):
+            return 
+        else:
+            temp=self.keys_vals[index-1]
+            for i in range(index,self.replicas):
+                temp2=self.keys_vals[i]
+                self.keys_vals[i]=temp
+                temp=temp2
+            return
+
+    def pushup(self,index):
+        if index>=self.replicas-1 or index<0:
+            return
+        for i in range(index+1,self.replicas):
+            self.keys_vals[i-1]=self.keys_vals[i]
+        return
 
     def is_alone(self):
         if self.prev_ip_port==self.succ_ip_port==self.ip_port:
@@ -157,6 +170,13 @@ class node():
     def return_node_stats(self):
 
         #SOS TO HASHTABLE EDW DEN KSERW PWS NA TO FTIAKSW
+        hashtable=""
+        for i in range(len(self.keys_vals)):
+            dict=self.keys_vals[i]
+            l=[]
+            for k,v in dict.items():
+                l.append(v)
+            hashtable+=str(l)+"\n"
 
-        msg=f"IP:{self.ip_port}\n ID:{self.id}\n Prev_IP:{ self.prev_ip_port}\n Next_IP:{ self.succ_ip_port}\n Boot_IP:{self.boot_ip_port}\n Hashtable:{json.dumps(self.keys_vals)}\n"
+        msg=f"\nIP:{self.ip_port}\n ID:{self.id}\n Prev_IP:{ self.prev_ip_port}\n Next_IP:{ self.succ_ip_port}\n Boot_IP:{self.boot_ip_port}\n Hashtable:\n"+hashtable+"\n"
         return msg
