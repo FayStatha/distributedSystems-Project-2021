@@ -312,8 +312,9 @@ def depart():
                 
                 # Then return the node to dafault state
                 node.init_state()
+                msg = f"Node {node.ip_port} successfully departed from Chord!\n"
 
-        return f"Node {node.ip_port} successfully departed from Chord!\n"
+        return msg
 
 
 @app.route('/overlay', methods=['POST'])

@@ -164,13 +164,11 @@ def file(**kwargs):
 
 	throughput = count/(end-start)
 
-	print("Throuput of Chord = %.4f requests/second"%throughput)
-    print("%.4f seconds per query"%(1/throughput))
-
-
+	print("Throuput of Chord = %.4f requests/second"%throughput, "%.4f seconds per query"%(1/throughput))
 
 if __name__ == '__main__':
     args = sys.argv
     if "--help" in args or len(args) == 1:
         print("You need to provide a command!")
     main()
+
