@@ -89,15 +89,6 @@ def depart(**kwargs):
     pass
 
 @main.command()
-@click.argument('node', required = True)
-def join(**kwargs):
-    """Join node with given ip to Chord"""
-    ip = kwargs['node']
-    r = requests.post('http://'+ip+"/join")
-    print(r.text)
-    pass
-
-@main.command()
 @click.argument('node', required = False)
 def overlay(**kwargs):
     """Returns Chord topology"""
