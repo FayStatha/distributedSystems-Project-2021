@@ -7,12 +7,6 @@ import json
 from node import node
 from threading import Thread
 import hashlib
-from colorama import Fore, Style
-
-# TODO
-# 2)make query(*)  case
-# 3)make request/response logs
-# 6) !!! debugging !!!
 
 
 app = Flask(__name__)
@@ -32,17 +26,6 @@ requests_list=[]
 responses_list=[]
 seqn=0
 
-
-
-bg_colors={'yellow':43, 'blue':44, 'red':41, 'green':42, 'purple':45}
-font_colors={'black':30, 'red':31, 'green':32, 'yellow':33, 'blue':34}
-
-def style_str(string,font_color,bg_color):
-    f_col=str(font_colors[font_color])
-    bg_col=str(bg_colors[bg_color])
-    style=f'2;{f_col};{bg_col}'
-    new_s= '\x1b[%sm %s \x1b[0m' %(style,string)
-    return new_s
 
 def make_req(req_type,data,req_code):
     req= { 'source':node.ip_port , 'type':req_type,  'data':data , 'seqn':(str(req_code)) }
@@ -84,21 +67,25 @@ def make_new_data(req_dict):
     new_data = {}
     req_type = req_dict['type']
     data = req_dict['data']
+
     if req_type == 'insert':
         value = data['value']
+        unhashed_key = data['unhashed_key']
         key = data['key']
         rep_number = int(data['repn']) - 1
-        new_data = {'key': key, 'value': value, 'repn': rep_number}
+        new_data = {'key': key, 'value': value, 'unhashed_key': unhashed_key, 'repn': rep_number}
 
     elif req_type == 'query':
+        unhashed_key = data['unhashed_key']
         key = data['key']
         rep_number = int(data['repn']) - 1
-        new_data = {'key': key, 'repn': rep_number}
+        new_data = {'key': key, 'unhashed_key': unhashed_key, 'repn': rep_number}
 
     elif req_type == 'delete':
+        unhashed_key = data['unhashed_key']
         key = data['key']
         rep_number = int(data['repn']) - 1
-        new_data = {'key': key, 'repn': rep_number}
+        new_data = {'key': key, 'unhashed_key': unhashed_key, 'repn': rep_number}
 
     elif req_type == 'insert_rep':
         rep_number = int(data['repn']) - 1
@@ -113,19 +100,23 @@ def take_action(req_dict):
     req_type=req_dict['type']
     data=req_dict['data']
     key = data['key']
+
     if req_type == 'insert':
+        unhashed_key = data['unhashed_key']
         value = data['value']
         repn = int(node.get_replicas()) - int(data['repn'])
-        msg = node.insert(key, value, repn)
+        msg = node.insert(key, value, unhashed_key, repn)
         print('take_action_insert: ', node.ip_port, ' action with ', key, value, repn)
         new_data = {'key': key, 'value': value, 'repn': data['repn'], 'resp_text': msg}
 
     elif req_type == 'query':
-        msg = node.query(key)
+        unhashed_key = data['unhashed_key']
+        msg = node.query(key, unhashed_key)
         new_data = {'key': key, 'resp_text': msg}
 
     elif req_type == 'delete':
-        msg = node.delete(key)
+        unhashed_key = data['unhashed_key']
+        msg = node.delete(key, unhashed_key)
         print('take_action_delete: ', node.ip_port, ' action with', key)
         new_data = {'key': key, 'repn': data['repn'], 'resp_text': msg}
 
@@ -205,7 +196,7 @@ def insert():
         key = hash(request_dict['key'])
         value = request_dict['value']
         rep_number = node.get_replicas()
-        data = {'key': key, 'value': value, 'repn': rep_number}
+        data = {'key': key, 'value': value, 'unhashed_key': request_dict['key'], 'repn': rep_number}
 
         req = make_req('insert', data, req_code)
         print(f"/insert REQUEST IS:{req}\n")
@@ -230,7 +221,7 @@ def query():
             
             key=hash(request_dict['key'])
             rep_number = node.get_replicas()
-            data={'key':key, 'repn': rep_number}
+            data={'key':key, 'unhashed_key': request_dict['key'],'repn': rep_number}
 
             req=make_req('query',data,req_code)
             post_req_thread(node.ip_port, req)
@@ -255,7 +246,7 @@ def delete():
         request_dict = request.form
         key = hash(request_dict['key'])
         rep_number = node.get_replicas()
-        data = {'key': key, 'repn': rep_number}
+        data = {'key': key, 'unhashed_key': request_dict['key'],'repn': rep_number}
 
         req = make_req('delete', data, req_code)
         post_req_thread(node.ip_port, req)
@@ -699,6 +690,7 @@ def ntwreq():
                     print(f"I AM POSTING THE RESPONSE:{resp}\n")
                     post_resp_thread(source, resp)
                 else:
+                    take_action(req_dict)
                     new_data = make_new_data(req_dict)
                     new_req = make_same_req(source, req_type, new_data, req_code)
                     print(f"I AM POSTING THE SAME REQ:{new_req} TO NEXT REPLICA MANAGER\n")

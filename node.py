@@ -48,36 +48,36 @@ class node():
                 return True
         return False
 
-    def insert(self, key, val, repn):
+    def insert(self, key, val, unhashed_key, repn):
         # returns pair inserted or updated if it already existed
         msg=""
         if self.keys_vals[int(repn)].get(key, "None")=="None":
-             msg+=f"pair ({key},{val}) inserted\n"
+             msg+=f"pair ({unhashed_key}, {val}) inserted\n"
         else:
-             msg+=f"pair ({key},{val}) updated\n"
+             msg+=f"pair ({unhashed_key}, {val}) updated\n"
         self.keys_vals[int(repn)].update({key: val})
         return msg
 
-    def query(self, key):
+    def query(self, key, unhashed_key):
         for data_dict in self.keys_vals:
             x = data_dict.get(key, "None")
             if x == "None":
                 continue
             else:
-                msg = f"The {key} corresponds to the value:{x}\n"
+                msg = f"The {unhashed_key} corresponds to the value:{x}\n"
                 return msg
-        msg = f"The key:{key} was not found\n"
+        msg = f"The key:{unhashed_key} was not found\n"
         return msg
 
-    def delete(self,key):
+    def delete(self,key, unhashed_key):
         for data_dict in self.keys_vals:
             x= data_dict.pop(key, "None")
             if x == "None":
                 continue
             else:
-                msg=f"Pair {key}:{x} deleted succesfully!\n"
+                msg=f"Pair {unhashed_key}: {x} deleted succesfully!\n"
                 return msg
-        msg=f"Key:{key} doesn't exist, hence cant be deleted\n"
+        msg=f"Key: {unhashed_key} doesn't exist, hence cant be deleted\n"
         return msg
 
     def delete_same_keys(self, index, my_dict):
