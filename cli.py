@@ -69,14 +69,6 @@ def query(**kwargs):
     node = kwargs['node']
 
     my_query(key, node)
-    '''
-    if kwargs['node'] != None:
-    	ip = kwargs['node']
-    else:
-    	ip = random_select()
-    r = requests.post('http://'+ip+'/query', data = { 'key':key })
-    print(r.text)
-	'''
     pass
 
 @main.command()
@@ -100,6 +92,15 @@ def overlay(**kwargs):
     r = requests.post('http://'+ip+'/overlay')
     print(r.text)
 
+    pass
+
+@main.command()
+@click.argument('node', required = True)
+def join(**kwargs):
+    """Join node with given ip to Chord"""
+    ip = kwargs['node']
+    r = requests.post('http://'+ip+"/join")
+    print(r.text)
     pass
 
 @main.command()
@@ -164,6 +165,7 @@ def file(**kwargs):
 	throughput = count/(end-start)
 
 	print("Throuput of Chord = %.4f requests/second"%throughput)
+    print("%.4f seconds per query"%(1/throughput))
 
 
 
