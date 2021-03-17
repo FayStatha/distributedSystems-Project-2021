@@ -749,11 +749,17 @@ def is_responsible(key):
         else:
             return False
 
+def delayed_join():
+    #delay it so that the server has started first before we call join
+    time.sleep(20)
+    requests.post("http://" + node.ip_port + "/join", json={})
+    return
+
 
 if __name__ == '__main__':
     # run join func via a thread so that the server will have begun when we get the response!!!!
     # if we dont use thread the response comes but the server hasnt started yet so it doesnt accept it
     # IT WORKED!!!
-    # thread = Thread(target=join)
-    # thread.start()
+    thread = Thread(target=delayed_join)
+    thread.start()
     app.run(host=host, port=port, debug=True)
