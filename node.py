@@ -135,14 +135,14 @@ class node():
                 if (k>id1 or k<=id2):
                     betw_keys[k]=v
                 else:
-                    new_keys_vals[k]=[v]
+                    new_keys_vals[k]=v                  
         #in this case we need and
         else:
             for k,v in self.keys_vals[0].items():
                 if (k>id1 and k<=id2):
                     betw_keys[k]=v
                 else:
-                    new_keys_vals[k]=[v]
+                    new_keys_vals[k]=v
 
         self.keys_vals[0]=new_keys_vals
         return betw_keys

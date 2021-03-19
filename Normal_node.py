@@ -91,6 +91,10 @@ def make_new_data(req_dict):
         rep_number = int(data['repn']) - 1
         new_data = {'keys_vals':data['keys_vals'], 'repn':rep_number, 'rep_code': data['rep_code'], 'first':False}
 
+    elif req_type == 'update_rep':
+        rep_number = int(data['repn']) - 1
+        new_data = {'keys_vals':data['keys_vals'], 'repn':rep_number, 'rep_code': data['rep_code'], 'first':False}
+
     return new_data
 
 
@@ -120,21 +124,19 @@ def take_action(req_dict):
         print('take_action_delete: ', node.ip_port, ' action with', key)
         new_data = {'key': key, 'repn': data['repn'], 'resp_text': msg}
 
-    elif req_type=='join':
-        #     1) update this nodes prev to source
-        #     2) update prev node's next to source-> post to /ntw_resp me type set_neighboors
-        #     3) remove keys needed from this node and hand to source
-        #     4)give sources' prev and next to node.prev and node.ip_port
-        id1=hash(node.prev_ip_port)
-        source=req_dict['source']
-        id2=hash(source)
-        join_keys_vals=node.rem_ret_betw_keys(id1, id2)
-        join_prev=node.prev_ip_port
-        join_succ=node.ip_port
+    elif req_type == 'join':
+        
+        id1 = hash(node.prev_ip_port)
+        source = req_dict['source']
+        id2 = hash(source)
+        join_keys_vals = node.rem_ret_betw_keys(id1, id2)
+        join_prev = node.prev_ip_port
+        join_succ = node.ip_port
         # post prev to update neighboors and w8 for response
-        post_resp_to(node.prev_ip_port,{'type':'set_neighboors' , 'prev':'None', 'succ':source})
-        node.prev_ip_port=source
-        new_data={'prev':join_prev, 'succ':join_succ, 'keys_vals':join_keys_vals}
+        post_resp_to(node.prev_ip_port, {'type': 'set_neighboors', 'prev': 'None', 'succ': source})
+        node.prev_ip_port = source
+        new_data = {'prev': join_prev, 'succ': join_succ, 'keys_vals': join_keys_vals}
+    
     return new_data
 
 
@@ -161,6 +163,12 @@ def handle_response(resp):
         elif resp_type == 'query_all':
             pairs = data['key-value pairs']
             msg = json.dumps(pairs)
+        elif resp_type == 'get_keys_vals':
+            i = 0
+            for my_dict in data['keys_vals']:
+                i += 1
+                node.keys_vals[i].update(my_dict)
+                msg = "replicas inserted successfully!\n"
         elif resp_type== 'join':
             #update prev next and keys
             node.set_neighboors(data['prev'],data['succ'])
@@ -357,22 +365,65 @@ def show_info():
 
 def join():
     # its important to stall join request so that our server has started properly and then we can get the boot server response
+    if request.method == 'POST':
+        global seqn
+        seqn=seqn+1
+        req_code=str(seqn)
 
-    global seqn
-    seqn=seqn+1
-    req_code=str(seqn)
+        data={'key':node.id}
+        req=make_req('join', data, req_code)
+        print(f"THIS IS THE JOIN REQUEST IM ABOUT TO SEND:{req}\n")
+        print(f"AND THIS IS THE ADDRESS I AM SENDINT IT TO:{node.boot_ip_port}\n")
+        post_req_thread(node.boot_ip_port, req)
 
-    data={'key':node.id}
-    req=make_req('join',data,req_code)
-    print(f"THIS IS THE JOIN REQUEST IM ABOUT TO SEND:{req}\n")
-    print(f"AND THIS IS THE ADDRESS I AM SENDINT IT TO:{node.boot_ip_port}\n")
-    post_req_thread(node.boot_ip_port, req)
-    while responses_dict.get(req_code,"None")=="None":
-        {}
-    # pop response from dict and handle it
-    resp=responses_dict.pop(req_code)
-    msg=(handle_response(resp))
-    return msg
+        while responses_dict.get(req_code+"join_vars","None")=="None":
+            {}
+        resp = responses_dict.pop(req_code+"join_vars")
+
+        message = resp['msg']
+
+        while responses_dict.get(req_code,"None")=="None":
+            {}
+        # pop response from dict and handle it
+        resp=responses_dict.pop(req_code)
+        msg=(handle_response(resp))
+
+        if message == "not ok" or int(node.get_replicas()) == 1:
+            return msg
+        else:
+            # you need to get replicas
+            # and also inform others to change them
+
+            rep_number = node.get_replicas()
+            curr_repn = int(rep_number) + 1
+
+            data = {'rec_port': node.prev_ip_port}
+            req = make_req('get_keys_vals', data, req_code)
+            print(f"THIS IS THE GET KEYS_VALS REQUEST IM ABOUT TO SEND:{req}\n")
+            print(f"AND THIS IS THE ADDRESS I AM SENDINT IT TO:{node.prev_ip_port}\n")
+            post_req_thread(node.prev_ip_port, req)
+            resp_code = req_code+'get_keys_vals'
+            while responses_dict.get(resp_code,"None")=="None":
+                {}
+            # pop response from dict and handle it
+            resp=responses_dict.pop(resp_code)
+
+            msg2 = (handle_response(resp))
+
+            for data_dict in node.keys_vals:
+
+                curr_repn -= 1
+                rep_code = req_code+"repn"+str(curr_repn)
+
+                data = {'keys_vals': data_dict, 'repn':str(curr_repn), 'rep_code': rep_code, 'first':True}
+                req = make_req('update_rep', data, req_code)
+                post_req_thread(node.succ_ip_port, req)
+
+                while responses_dict.get(rep_code,"None")=="None":
+                    {}
+
+            return msg
+
 
 
 @app.route('/ntwreq',methods=['POST'])
@@ -428,7 +479,59 @@ def ntwreq():
                 if int(data.get('repn')) != 1:
                     new_req = make_same_req(source, req_type, new_data, req_code)
                     print(f"I AM POSTING THE SAME REQ:{new_req} TO NEXT REPLICA MANAGER\n")
-                    post_req_thread(node.succ_ip_port, new_req)    
+                    post_req_thread(node.succ_ip_port, new_req)
+
+
+        elif req_type == 'update_rep':
+
+            if int(data.get('repn')) == int(node.get_replicas()) or data.get('first'):
+                # do actions, make response , post it to source /ntwresp
+                # take_action(req_dict) -> do actions and return new_data
+                index = int(node.get_replicas()) - int(data.get('repn'))
+
+                node.delete_same_keys(index, data['keys_vals'])
+
+                if index+1 < int(node.get_replicas()):
+                    node.keys_vals[index+1].update(data['keys_vals'])
+
+                resp_code = data.get('rep_code')
+                resp_text = "Data for "+resp_code+" updated!\n"
+                resp_data = {'sender_ip_port': node.ip_port, 'resp_text': resp_text}
+                resp = make_resp(source, req_type, resp_data, resp_code)
+                print(f"I AM POSTING THE RESPONSE:{resp}")
+                post_resp_thread(source, resp)
+
+                if int(node.get_replicas()) != 1:
+                    new_data = make_new_data(req_dict)
+                    new_req = make_same_req(source, req_type, new_data, req_code)
+                    print(f"I AM POSTING THE SAME REQ:{new_req} TO NEXT REPLICA MANAGER\n")
+                    post_req_thread(node.succ_ip_port, new_req)
+
+            elif 0 < int(data.get('repn')) < int(node.get_replicas()):
+                # at least the responsible server has taken care of the request
+                # replica managers don't send responses
+
+                index = int(node.get_replicas()) - int(data.get('repn'))
+
+                node.delete_same_keys(index, data['keys_vals'])
+
+                if index+1 < int(node.get_replicas()):
+                    node.keys_vals[index+1].update(data['keys_vals'])
+
+                new_data = make_new_data(req_dict)
+                if int(data.get('repn')) != 1:
+                    new_req = make_same_req(source, req_type, new_data, req_code)
+                    print(f"I AM POSTING THE SAME REQ:{new_req} TO NEXT REPLICA MANAGER\n")
+                    post_req_thread(node.succ_ip_port, new_req)
+
+        elif req_type == 'get_keys_vals':
+
+            if node.ip_port == data.get('rec_port'):
+
+                resp_data = {'keys_vals' : node.keys_vals[:-1]}
+                resp_code = str(req_code)+'get_keys_vals'
+                resp = make_resp(source, req_type, resp_data, resp_code)
+                post_resp_thread(source, resp) 
 
         elif req_type== 'depart':
  
@@ -526,7 +629,7 @@ def ntwreq():
                 print(f"I AM POSTING THE SAME REQ:{req_dict} TO NEXT NODE\n")
                 post_req_thread(node.succ_ip_port, req_dict)
 
-        else:
+        elif req_type == 'join':
 
             if is_responsible(data.get('key')):
                 # do actions, make response , post it to source /ntwresp
@@ -589,7 +692,64 @@ def ntwreq():
                     resp_data = {'sender_ip_port': node.ip_port, 'resp_text': resp_text}
                     resp = make_resp(source, req_type, resp_data, resp_code)
                     print(f"I AM POSTING THE RESPONSE:{resp}")
-                    post_resp_thread(source, resp)   
+                    post_resp_thread(source, resp)
+
+        if req_type == 'update_rep':
+
+            if int(data.get('repn')) == int(node.get_replicas()) or data.get('first'):
+                # do actions, make response , post it to source /ntwresp
+                # take_action(req_dict) -> do actions and return new_data
+                index = int(node.get_replicas()) - int(data.get('repn'))
+
+                node.delete_same_keys(index, data['keys_vals'])
+
+                if index+1 < int(node.get_replicas()):
+                    node.keys_vals[index+1].update(data['keys_vals'])
+
+                if int(node.get_replicas()) != 1 and int(data.get('repn')) != 1:
+                    new_data = make_new_data(req_dict)
+                    new_req = make_same_req(source, req_type, new_data, req_code)
+                    print(f"I AM POSTING THE SAME REQ:{new_req} TO NEXT REPLICA MANAGER\n")
+                    post_req_thread(node.succ_ip_port, new_req)
+                else:
+                    resp_code = data.get('rep_code')
+                    resp_text = "Data for "+resp_code+" updated!\n"
+                    resp_data = {'sender_ip_port': node.ip_port, 'resp_text': resp_text}
+                    resp = make_resp(source, req_type, resp_data, resp_code)
+                    print(f"I AM POSTING THE RESPONSE:{resp}")
+                    post_resp_thread(source, resp)
+
+            elif 0 < int(data.get('repn')) < int(node.get_replicas()):
+                # at least the responsible server has taken care of the request
+                # replica managers don't send responses
+                index = int(node.get_replicas()) - int(data.get('repn'))
+
+                node.delete_same_keys(index, data['keys_vals'])
+
+                if index+1 < int(node.get_replicas()):
+                    node.keys_vals[index+1].update(data['keys_vals'])
+
+                new_data = make_new_data(req_dict)
+                if int(data.get('repn')) != 1:
+                    new_req = make_same_req(source, req_type, new_data, req_code)
+                    print(f"I AM POSTING THE SAME REQ:{new_req} TO NEXT REPLICA MANAGER\n")
+                    post_req_thread(node.succ_ip_port, new_req)
+                else:
+                    resp_code = data.get('rep_code')
+                    resp_text = "Data for "+resp_code+" updated!\n"
+                    resp_data = {'sender_ip_port': node.ip_port, 'resp_text': resp_text}
+                    resp = make_resp(source, req_type, resp_data, resp_code)
+                    print(f"I AM POSTING THE RESPONSE:{resp}")
+                    post_resp_thread(source, resp)
+
+        elif req_type == 'get_keys_vals':
+
+            if node.ip_port == data.get('rec_port'):
+
+                resp_data = {'keys_vals' : node.keys_vals[:-1]}
+                resp_code = str(req_code)+'get_keys_vals'
+                resp = make_resp(source, req_type, resp_data, resp_code)
+                post_resp_thread(source, resp)
 
         elif req_type== 'depart':
  
@@ -700,7 +860,7 @@ def ntwreq():
                 print(f"I AM POSTING THE SAME REQ:{req_dict} TO NEXT NODE\n")
                 post_req_thread(node.succ_ip_port, req_dict)
 
-        else:
+        elif req_type == 'join':
             # only join function here, not set already
             if is_responsible(data.get('key')):
                 # do actions, make response , post it to source /ntwresp
@@ -724,9 +884,12 @@ def ntwresp():
         print('normal:', node.ip_port, 'with:', prev_ip_port, succ_ip_port)
         node.set_neighboors(prev_ip_port,succ_ip_port)
     elif resp_dict['type']=='join_vars':
+        print(resp_dict)
         repn = resp_dict['repn']
         rep_type = resp_dict['rep_type']
         node.join_set_vars(repn, rep_type)
+        seqn=resp_dict['seqn']
+        responses_dict[seqn]=resp_dict
     else:
         seqn=resp_dict['seqn']
         responses_dict[seqn]=resp_dict
