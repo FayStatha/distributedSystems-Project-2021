@@ -4,11 +4,18 @@ import requests, random, re, sys, click, time
 # all our nodes have ips: serverX:port
 
 def random_select():
-	r = requests.post('http://server1:5000/overlay')
-	data = '['+r.text.split('[')[1]
-	my_list = re.findall("server.{6}", data)
+    r = requests.post('http://127.0.0.1:5000/overlay')
+    nodes_list = r.json()
+    ip_list = []
 
-	return random.choice(my_list)
+    for node in nodes_list:
+        temp_ip = (node['node_ip_port'])
+        ip_list.append(temp_ip)
+
+    ip = random.choice(ip_list)
+
+    print(ip)
+    return ip
 
 def my_insert(key, value, node = None):
     if node != None:
@@ -115,8 +122,9 @@ def overlay(**kwargs):
     	ip = kwargs['node']
     else:
     	ip = random_select()
+        
     r = requests.post('http://'+ip+'/overlay')
-    print(r.text)
+    print("This is the Chord topology: \n"+r.text)
 
     pass
 
