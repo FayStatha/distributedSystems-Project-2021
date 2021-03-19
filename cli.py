@@ -24,7 +24,11 @@ def my_query(key, node = None):
     else:
     	ip = random_select()
     r = requests.post('http://'+ip+'/query', data = { 'key':key })
-    print(r.text)		
+    print(r.text)
+
+def checknodes():
+    r = requests.post('http://127.0.0.1:5000/checknodes')
+    return r.text
 
 @click.group()
 def main():
@@ -37,11 +41,18 @@ def main():
 @click.argument('node', required = False)
 def insert(**kwargs):
     """Insert given key-value pair in Chord!"""
-    key = kwargs['key']
-    value = kwargs['value']
-    node = kwargs['node']
 
-    my_insert(key, value, node)
+    msg = checknodes()
+    if msg == "ok":
+
+        key = kwargs['key']
+        value = kwargs['value']
+        node = kwargs['node']
+
+        my_insert(key, value, node)
+
+    else:
+        print(msg)
 
     pass
 
@@ -50,14 +61,21 @@ def insert(**kwargs):
 @click.argument('node', required = False)
 def delete(**kwargs):
     """Deletes key-value pair for given key"""
-    key = kwargs['key']
 
-    if kwargs['node'] != None:
-    	ip = kwargs['node']
+    msg = checknodes()
+    if msg == "ok":
+
+        key = kwargs['key']
+
+        if kwargs['node'] != None:
+        	ip = kwargs['node']
+        else:
+        	ip = random_select()
+        r = requests.post('http://'+ip+'/delete', data = { 'key':key })
+        print(r.text)
+
     else:
-    	ip = random_select()
-    r = requests.post('http://'+ip+'/delete', data = { 'key':key })
-    print(r.text)
+        print(msg)
     pass
 
 @main.command()
@@ -65,10 +83,18 @@ def delete(**kwargs):
 @click.argument('node', required = False)
 def query(**kwargs):
     """Find the key-value pair for given key"""
-    key = kwargs['key']
-    node = kwargs['node']
 
-    my_query(key, node)
+    msg = checknodes()
+
+    if msg == "ok":
+
+        key = kwargs['key']
+        node = kwargs['node']
+
+        my_query(key, node)
+
+    else:
+        print(msg)
     pass
 
 @main.command()
@@ -105,66 +131,72 @@ def join(**kwargs):
 
 @main.command()
 @click.argument('file_path', required = True)
-@click.option('--request_type',
-              type=click.Choice(['insert', 'query', 'mix'], case_sensitive=False))
+@click.option('--request_type', type = click.Choice(['insert', 'query', 'mix'], case_sensitive = False))
 def file(**kwargs):
-	"""Send requests with input from a file"""
+    """Send requests with input from a file"""
 
-	count = 0
+    msg = checknodes()
 
-	file = kwargs['file_path']
-	file1 = open(file, 'r')
-	Lines = file1.readlines()
+    if (msg == "ok"):
 
-	if kwargs['request_type'] == 'insert':
-		
-		start = time.time()
+        count = 0
 
-		for line in Lines:
-			count += 1
-			line_list = line.strip().split(',')
-			key = line_list[0]
-			value = line_list[1]
-			my_insert(key, value)
+        file = kwargs['file_path']
+        file1 = open(file, 'r')
+        Lines = file1.readlines()
 
-		end = time.time()
+        if kwargs['request_type'] == 'insert':
+            
+            start = time.time()
 
-	elif kwargs['request_type'] == 'query':
-		
-		start = time.time()
+            for line in Lines:
+                count += 1
+                line_list = line.strip().split(',')
+                key = line_list[0]
+                value = line_list[1]
+                my_insert(key, value)
 
-		for line in Lines:
-			count += 1
-			line_list = line.strip().split(',')
-			key = line_list[0]
-			my_query(key)
+            end = time.time()
 
-		end = time.time()
+        elif kwargs['request_type'] == 'query':
+            
+            start = time.time()
 
-	elif kwargs['request_type'] == 'mix':
+            for line in Lines:
+                count += 1
+                line_list = line.strip().split(',')
+                key = line_list[0]
+                my_query(key)
 
-		start = time.time()
+            end = time.time()
 
-		for line in Lines:
-			count += 1
-			line_list = line.strip().split(',')
-			req_type = line_list[0]
-			key = line_list[1]
+        elif kwargs['request_type'] == 'mix':
 
-			if req_type == 'insert':
+            start = time.time()
 
-				value = line_list[2]
-				my_insert(key, value)
+            for line in Lines:
+                count += 1
+                line_list = line.strip().split(',')
+                req_type = line_list[0]
+                key = line_list[1]
 
-			elif req_type == 'query':
+                if req_type == 'insert':
 
-				my_query(key)
+                    value = line_list[2]
+                    my_insert(key, value)
 
-			end = time.time()
+                elif req_type == 'query':
 
-	throughput = count/(end-start)
+                    my_query(key)
 
-	print("Throuput of Chord = %.4f requests/second"%throughput, "%.4f seconds per query"%(1/throughput))
+                end = time.time()
+
+        throughput = count/(end-start)
+
+        print("Throuput of Chord = %.4f requests/second"%throughput, "%.4f seconds per query"%(1/throughput))
+
+    else:
+        print(msg)
 
 if __name__ == '__main__':
     args = sys.argv

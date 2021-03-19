@@ -178,6 +178,14 @@ def func1():
         print(resp_text)
         return resp_text
 
+@app.route('/checknodes', methods=['POST'])
+def checknodes():
+	if request.method == 'POST':
+		if (node.enoughNodesInChord()):
+			return "ok"
+		else:
+			return f"Not enough nodes in Chord for supported replication factor. Only joins allowed!\nNodes in Chord: {node.nodesInChord}\nReplication factor: {node.get_replicas()}"
+
 
 @app.route('/insert', methods=['POST'])
 def insert():
@@ -455,6 +463,7 @@ def ntwreq():
 
             # only join function here, not set already
             post_resp_to(source, {'type': 'join_vars', 'repn': node.get_replicas(), 'rep_type': node.get_rep_type()})
+            node.increaseNodesInChord()
 
             if is_responsible(data.get('key')):
                 # do actions, make response , post it to source /ntwresp
@@ -628,6 +637,8 @@ def ntwreq():
                 post_req_thread(node.succ_ip_port, req_dict)
         else:
             post_resp_to(source, {'type': 'join_vars', 'repn': node.get_replicas(), 'rep_type': node.get_rep_type()})
+            node.increaseNodesInChord()
+
             # only join function here, not set already
             if is_responsible(data.get('key')):
                 # do actions, make response , post it to source /ntwresp
