@@ -638,28 +638,19 @@ def ntwreq():
 
         elif req_type == 'query':
 
-            if is_responsible(data.get('key')):
-                if int(node.get_replicas()) != 1:
-                    new_data = make_new_data(req_dict)
-                    new_req = make_same_req(source, req_type, new_data, req_code)
-                    print(f"I AM POSTING THE SAME REQ:{new_req} TO NEXT REPLICA MANAGER\n")
-                    post_req_thread(node.succ_ip_port, new_req)
-                else:
-                    new_data = take_action(req_dict)
-                    resp = make_resp(source, req_type, new_data, req_code)
-                    print(f"I AM POSTING THE QUERY RESPONSE:{resp}\n")
-                    post_resp_thread(source, resp)
-            elif 0 < int(data.get('repn')) < int(node.get_replicas()):
-                if int(data.get('repn')) == 1:
-                    new_data = take_action(req_dict)
-                    resp = make_resp(source, req_type, new_data, req_code)
-                    print(f"I AM POSTING THE QUERY RESPONSE:{resp}\n")
-                    post_resp_thread(source, resp)
-                else:
-                    new_data = make_new_data(req_dict)
-                    new_req = make_same_req(source, req_type, new_data, req_code)
-                    print(f"I AM POSTING THE SAME REQ:{new_req} TO NEXT REPLICA MANAGER\n")
-                    post_req_thread(node.succ_ip_port, new_req)
+            if is_responsible(data.get('key')) and not node.has_key(data.get('key')):
+                # the key does not belong in chord, so last RM cant respond
+                new_data = take_action(req_dict)
+                resp = make_resp(source, req_type, new_data, req_code)
+                print(f"I AM POSTING THE QUERY RESPONSE:{resp}\n")
+                post_resp_thread(source, resp)
+
+            elif node.is_last_RM(data.get('key')):
+                new_data = take_action(req_dict)
+                resp = make_resp(source, req_type, new_data, req_code)
+                print(f"I AM POSTING THE QUERY RESPONSE:{resp}\n")
+                post_resp_thread(source, resp)
+
             else:
                 # post same request to succ /ntwreq
                 print(f"I AM POSTING THE SAME REQ:{req_dict} TO NEXT NODE\n")

@@ -48,6 +48,12 @@ class node():
                 return True
         return False
 
+    def is_last_RM(self, key):
+        index = int(self.replicas) - 1
+        if self.keys_vals[index].get(key, "None") == "None":
+            return False
+        return True
+
     def insert(self, key, val, unhashed_key, repn):
         # returns pair inserted or updated if it already existed
         msg=""
