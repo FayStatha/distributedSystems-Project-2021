@@ -160,7 +160,7 @@ def handle_response(resp):
             msg = json.dumps(topology)
         elif resp_type == 'query_all':
             pairs = data['key-value pairs']
-            msg = "Those are all key-value pairs in Chord:\n" + str(pairs)+"\n"
+            msg = json.dumps(pairs)
         elif resp_type== 'join':
             #update prev next and keys
             node.set_neighboors(data['prev'],data['succ'])

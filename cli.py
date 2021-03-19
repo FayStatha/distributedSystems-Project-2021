@@ -31,7 +31,13 @@ def my_query(key, node = None):
     else:
     	ip = random_select()
     r = requests.post('http://'+ip+'/query', data = { 'key':key })
-    print(r.text)
+
+    if (key == '*'):
+        print("Those are all key-value pairs in Chord:\n")
+        for node in r.json():
+            print(node, "\n")
+    else:
+        print(r.text)
 
 def checknodes():
     r = requests.post('http://127.0.0.1:5000/checknodes')
@@ -122,7 +128,7 @@ def overlay(**kwargs):
     	ip = kwargs['node']
     else:
     	ip = random_select()
-        
+
     r = requests.post('http://'+ip+'/overlay')
     print("This is the Chord topology: \n"+r.text)
 

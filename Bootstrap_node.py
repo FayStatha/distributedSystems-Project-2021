@@ -160,12 +160,11 @@ def handle_response(resp):
             msg = data['resp_text']
         elif resp_type == 'overlay':
             topology = data['topology']
-            #msg = "This is the Chord topology:\n" + str(topology)+"\n"
             msg = json.dumps(topology)
         elif resp_type == 'query_all':
             pairs = data['key-value pairs']
-            msg = "Those are all key-value pairs in Chord:\n" + str(pairs)+"\n"
-            
+            #msg = "Those are all key-value pairs in Chord:\n" + str(pairs)+"\n"
+            msg = json.dumps(pairs)
     return msg
 
 
