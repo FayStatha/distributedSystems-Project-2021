@@ -309,6 +309,14 @@ def depart():
                 resp_succ=responses_dict.pop(succ_code)
                 handle_response(resp_prev)
                 handle_response(resp_succ)
+
+                req_code = str(seqn)+'departing_node'
+                data = {}
+                req = make_req('departing_node', data, req_code)
+                post_req_thread(node.boot_ip_port, req)
+
+                while responses_dict.get(req_code,"None")=="None":
+                    {}
                 
                 # Then return the node to dafault state
                 node.init_state()

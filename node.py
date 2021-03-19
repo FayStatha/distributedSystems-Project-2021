@@ -32,13 +32,11 @@ class node():
         #Getter for isInChord variable
         return self.isInChord
 
-    def enoughNodesInChord(self):
-        if (self.nodesInChord >= int(self.replicas)):
-            return True
-        return False
-
     def increaseNodesInChord(self):
         self.nodesInChord += 1
+
+    def decreaseNodesInChord(self):
+        self.nodesInChord -= 1
 
     def hash(self,text):
         hash_object = hashlib.sha1(text.encode())

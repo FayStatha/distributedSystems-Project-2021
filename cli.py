@@ -1,47 +1,5 @@
-import requests, random, re, sys, click, time
-
-# random select, selects randomly an online node to send the request
-# all our nodes have ips: serverX:port
-
-def random_select():
-    r = requests.post('http://127.0.0.1:5000/overlay')
-    nodes_list = r.json()
-    ip_list = []
-
-    for node in nodes_list:
-        temp_ip = (node['node_ip_port'])
-        ip_list.append(temp_ip)
-
-    ip = random.choice(ip_list)
-
-    print(ip)
-    return ip
-
-def my_insert(key, value, node = None):
-    if node != None:
-    	ip = node
-    else:
-    	ip = random_select()
-    r = requests.post('http://'+ip+'/insert', data = { 'key':key, 'value':value })
-    print(r.text)	
-
-def my_query(key, node = None):
-    if node != None:
-    	ip = node
-    else:
-    	ip = random_select()
-    r = requests.post('http://'+ip+'/query', data = { 'key':key })
-
-    if (key == '*'):
-        print("Those are all key-value pairs in Chord:\n")
-        for node in r.json():
-            print(node, "\n")
-    else:
-        print(r.text)
-
-def checknodes():
-    r = requests.post('http://127.0.0.1:5000/checknodes')
-    return r.text
+import requests, random, sys, click, time
+import common_functions
 
 @click.group()
 def main():
@@ -55,14 +13,14 @@ def main():
 def insert(**kwargs):
     """Insert given key-value pair in Chord!"""
 
-    msg = checknodes()
-    if msg == "ok":
+    msg = common_functions.checknodes()
+    if msg == "ok" or msg == "not depart":
 
         key = kwargs['key']
         value = kwargs['value']
         node = kwargs['node']
 
-        my_insert(key, value, node)
+        common_functions.insert(key, value, node)
 
     else:
         print(msg)
@@ -75,15 +33,15 @@ def insert(**kwargs):
 def delete(**kwargs):
     """Deletes key-value pair for given key"""
 
-    msg = checknodes()
-    if msg == "ok":
+    msg = common_functions.checknodes()
+    if msg == "ok" or msg == "not depart":
 
         key = kwargs['key']
 
         if kwargs['node'] != None:
         	ip = kwargs['node']
         else:
-        	ip = random_select()
+        	ip = common_functions.random_select()
         r = requests.post('http://'+ip+'/delete', data = { 'key':key })
         print(r.text)
 
@@ -97,14 +55,14 @@ def delete(**kwargs):
 def query(**kwargs):
     """Find the key-value pair for given key"""
 
-    msg = checknodes()
+    msg = common_functions.checknodes()
 
-    if msg == "ok":
+    if msg == "ok" or msg =="not depart":
 
         key = kwargs['key']
         node = kwargs['node']
 
-        my_query(key, node)
+        common_functions.query(key, node)
 
     else:
         print(msg)
@@ -114,9 +72,16 @@ def query(**kwargs):
 @click.argument('node', required = True)
 def depart(**kwargs):
     """Departs node with given ip from Chord"""
-    ip = kwargs['node']
-    r = requests.post('http://'+ip+"/depart")
-    print(r.text)
+
+    msg = common_functions.checknodes()
+
+    if msg != "ok":
+        print("No node can depart from Chord, because then not enough nodes for supported replication factor will be online!\n")
+
+    else:
+        ip = kwargs['node']
+        r = requests.post('http://'+ip+"/depart")
+        print(r.text)
     pass
 
 @main.command()
@@ -127,7 +92,7 @@ def overlay(**kwargs):
     if kwargs['node'] != None:
     	ip = kwargs['node']
     else:
-    	ip = random_select()
+    	ip = common_functions.random_select()
 
     r = requests.post('http://'+ip+'/overlay')
     print("This is the Chord topology: \n"+r.text)
@@ -149,9 +114,9 @@ def join(**kwargs):
 def file(**kwargs):
     """Send requests with input from a file"""
 
-    msg = checknodes()
+    msg = common_functions.checknodes()
 
-    if (msg == "ok"):
+    if msg == "ok" or msg == "not depart":
 
         count = 0
 
@@ -168,7 +133,7 @@ def file(**kwargs):
                 line_list = line.strip().split(',')
                 key = line_list[0]
                 value = line_list[1]
-                my_insert(key, value)
+                common_functions.insert(key, value)
 
             end = time.time()
 
@@ -180,7 +145,7 @@ def file(**kwargs):
                 count += 1
                 line_list = line.strip().split(',')
                 key = line_list[0]
-                my_query(key)
+                common_functions.query(key)
 
             end = time.time()
 
@@ -197,11 +162,11 @@ def file(**kwargs):
                 if req_type == 'insert':
 
                     value = line_list[2]
-                    my_insert(key, value)
+                    common_functions.insert(key, value)
 
                 elif req_type == 'query':
 
-                    my_query(key)
+                    common_functions.query(key)
 
                 end = time.time()
 

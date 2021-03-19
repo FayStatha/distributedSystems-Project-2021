@@ -163,7 +163,6 @@ def handle_response(resp):
             msg = json.dumps(topology)
         elif resp_type == 'query_all':
             pairs = data['key-value pairs']
-            #msg = "Those are all key-value pairs in Chord:\n" + str(pairs)+"\n"
             msg = json.dumps(pairs)
     return msg
 
@@ -181,8 +180,10 @@ def func1():
 @app.route('/checknodes', methods=['POST'])
 def checknodes():
 	if request.method == 'POST':
-		if (node.enoughNodesInChord()):
+		if node.nodesInChord > int(node.get_replicas()):
 			return "ok"
+		elif node.nodesInChord == int(node.get_replicas()):
+			return "not depart"
 		else:
 			return f"Not enough nodes in Chord for supported replication factor. Only joins allowed!\nNodes in Chord: {node.nodesInChord}\nReplication factor: {node.get_replicas()}"
 
@@ -361,7 +362,13 @@ def ntwreq():
                 if int(data.get('repn')) != 1:
                     new_req = make_same_req(source, req_type, new_data, req_code)
                     print(f"I AM POSTING THE SAME REQ:{new_req} TO NEXT REPLICA MANAGER\n")
-                    post_req_thread(node.succ_ip_port, new_req)    
+                    post_req_thread(node.succ_ip_port, new_req)
+
+        elif req_type == 'departing_node':
+        	node.decreaseNodesInChord()
+        	resp = make_resp(source, req_type, {}, req_code)
+        	post_resp_thread(source, resp)
+
 
         elif req_type== 'depart':
  
@@ -525,7 +532,12 @@ def ntwreq():
 	                resp_data = {'sender_ip_port': node.ip_port, 'resp_text': resp_text}
 	                resp = make_resp(source, req_type, resp_data, resp_code)
 	                print(f"I AM POSTING THE RESPONSE:{resp}")
-	                post_resp_thread(source, resp) 
+	                post_resp_thread(source, resp)
+
+        elif req_type == 'departing_node':
+        	node.decreaseNodesInChord()
+        	resp = make_resp(source, req_type, {}, req_code)
+        	post_resp_thread(source, resp)
 
         elif req_type== 'depart':
  
