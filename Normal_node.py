@@ -70,7 +70,7 @@ def hash(text):
     hash_code = hash_object.hexdigest()
     return hash_code
 
-def handle_response(resp):
+def handle_response(resp, **kwargs):
     receiver=resp['receiver']
     resp_type=resp['type']
     data=resp['data']
@@ -79,10 +79,16 @@ def handle_response(resp):
     if(node.ip_port== receiver):
         if resp_type=='insert':
             msg=data['resp_text']
+            c = kwargs.get('unhashed_key', None)
+            msg = 'Key:' + c + ' ' + msg
         elif resp_type== 'query':
             msg=data['resp_text']
+            c = kwargs.get('unhashed_key', None)
+            msg = 'Key:' + c + ' ' + msg
         elif resp_type== 'delete':
             msg=data['resp_text']
+            c = kwargs.get('unhashed_key', None)
+            msg = 'Key:' + c + ' ' + msg
         elif resp_type== 'depart':
             msg=data['resp_text']
         elif resp_type == 'overlay':
@@ -127,7 +133,7 @@ def insert():
         #       pop response from dict and handle it
         resp = responses_dict.pop(req_code)
 
-        return handle_response(resp)
+        return handle_response(resp, unhashed_key=request_dict['key'])
 
 @app.route('/query', methods=['POST'])
 def query():
@@ -153,7 +159,7 @@ def query():
             {}
         #       pop response from dict and handle it
         resp = responses_dict.pop(req_code)
-        msg=handle_response(resp)
+        msg=handle_response(resp,unhashed_key=request_dict['key'])
         response = flask.jsonify(result=msg)
         return response
 
@@ -174,7 +180,7 @@ def delete():
             {}
         #       pop response from dict and handle it
         resp = responses_dict.pop(req_code)
-        return handle_response(resp)
+        return handle_response(resp,unhashed_key=request_dict['key'])
 
 @app.route('/depart', methods=['POST'])
 def depart():
@@ -299,13 +305,18 @@ def join():
     resp = responses_dict.pop(req_code)
     prev_keys = resp['data']['keys']
 
+    post_resp_to(node.boot_ip_port, {'type': 'inc_number'})
+
     # vale ta keys 0--k-2 tou prev sta dika sou 1--k-1
-    for i in range(node.get_replicas() - 1):
+    # if nodes_in_chord < k then go till nodes_in_chord -1 element
+    nodes_in_chord= requests.post("http://" + node.boot_ip_port + "/ntwresp", json={'type':'nodes_in_chord'})
+    nodes_in_chord = json.loads(nodes_in_chord.text)['nodes_in_chord']
+    limit=min(nodes_in_chord,node.get_replicas())
+    for i in range(limit - 1):
         node.keys_vals[i + 1] = prev_keys[i]
 
     msg = ("Node joined succesfully")
-    # Increase Bootstarap counter
-    post_resp_to(node.boot_ip_port,{'type':'inc_number'})
+
     return msg
 
 @app.route('/ntwreq',methods=['POST'])
@@ -430,7 +441,7 @@ def dispatch_query(source,req_code,req_type,data):
         value=node.query(key)
         if node.get_rep_type()=="eventual":
             if value!="None":
-                resp_text = "Key:" + key + " has value:" + value + " found at node:" + node.ip_port
+                resp_text = "has value:" + value + " found at node:" + node.ip_port
                 resp = make_resp(source, req_type, {'resp_text': resp_text}, req_code)
                 post_resp_thread(source, resp)
                 return
@@ -441,9 +452,9 @@ def dispatch_query(source,req_code,req_type,data):
         else:
         #is last node respond to source
             if value=="None":
-                resp_text="Key:"+key+"not found!"
+                resp_text = "not found at node " + node.ip_port
             else:
-                resp_text = "Key:" + key + " has value:" + value + " found at node:" + node.ip_port
+                resp_text = "has value:" + value + " found at node:" + node.ip_port
             resp = make_resp(source, req_type, {'resp_text': resp_text}, req_code)
             post_resp_thread(source, resp)
     else:
@@ -453,7 +464,7 @@ def dispatch_query(source,req_code,req_type,data):
             if node.get_rep_type()=="eventual":
                 value=node.query(key)
                 if (value!="None"):
-                    resp_text = "Key:" + key + " has value:" + value + " found at node:" + node.ip_port
+                    resp_text = "has value:" + value + " found at node:" + node.ip_port
                     resp = make_resp(source, req_type, {'resp_text': resp_text}, req_code)
                     post_resp_thread(source, resp)
                     return
@@ -465,7 +476,7 @@ def dispatch_query(source,req_code,req_type,data):
             if new_val!="None" :
                 value=new_val
                 if node.get_rep_type()=="eventual":
-                    resp_text = "Key:" + key + " has value:" + value + " found at node:" + node.ip_port
+                    resp_text = "has value:" + value + " found at node:" + node.ip_port
                     resp = make_resp(source, req_type, {'resp_text': resp_text}, req_code)
                     post_resp_thread(source, resp)
                     return
@@ -476,9 +487,9 @@ def dispatch_query(source,req_code,req_type,data):
             else:
                 #its last node respond to source
                 if value == "None":
-                    resp_text = "Key:" + key + "not found!"
+                    resp_text="not found at node "+node.ip_port
                 else:
-                    resp_text = "Key:" + key + " has value:" + value + " found at node:" + node.ip_port
+                    resp_text = "has value:" + value + " found at node:" + node.ip_port
                 resp = make_resp(source, req_type, {'resp_text': resp_text}, req_code)
                 post_resp_thread(source, resp)
     return
@@ -491,10 +502,10 @@ def dispatch_insert(source,req_code,req_type,data):
     resp_ip_port=data['resp_ip_port']
     if is_responsible(key):
         resp_ip_port=node.ip_port
-        node.insert(key,value,index)
+        text = node.insert(key, value, index)
         #check if last --> if so respond to source and return
         if index==node.get_replicas()-1 or node.succ_ip_port==resp_ip_port:
-            resp_text="Pair:("+key+","+value+") inserted at node:"+node.ip_port
+            resp_text = text + " at node:" + node.ip_port
             resp=make_resp(source,req_type,{'resp_text':resp_text},req_code)
             post_resp_thread(source,resp)
             #its important to return here
@@ -503,7 +514,7 @@ def dispatch_insert(source,req_code,req_type,data):
             #if type == eventual respond to source
             if node.get_rep_type() == "eventual":
                 debug("INSERT---> EVENTUAL IF")
-                resp_text = "Pair:(" + key + "," + value + ") inserted at node:" + node.ip_port
+                resp_text = text + " at node:" + node.ip_port
                 resp = make_resp(source, req_type, {'resp_text': resp_text}, req_code)
                 post_resp_thread(source, resp)
             #now forward request to next node
@@ -514,11 +525,11 @@ def dispatch_insert(source,req_code,req_type,data):
         new_req=make_same_req(source,req_type,data,req_code)
         post_req_thread(node.succ_ip_port,new_req)
     else:
-        node.insert(key,value,index)
+        text=node.insert(key,value,index)
         # if last_node dont forward , also if linear.. respond to source
         if index==node.get_replicas()-1 or node.succ_ip_port==resp_ip_port:
             if node.get_rep_type()=="linearizability":
-                resp_text = "Pair:(" + key + "," + value + ") inserted at node:" + node.ip_port
+                resp_text = text + " at node:" + node.ip_port
                 resp = make_resp(source, req_type, {'resp_text': resp_text}, req_code)
                 post_resp_thread(source, resp)
         else:
@@ -535,10 +546,10 @@ def dispatch_delete(source,req_code,req_type,data):
     resp_ip_port = data['resp_ip_port']
     if is_responsible(key):
         resp_ip_port = node.ip_port
-        node.delete(key)
+        text=node.delete(key)
         # check if last --> if so respond to source and return
         if index == node.get_replicas() - 1 or node.succ_ip_port == resp_ip_port:
-            resp_text = "Key:" + key + " deleted at node:" + node.ip_port
+            resp_text = text+ " at node:" + node.ip_port
             resp = make_resp(source, req_type, {'resp_text': resp_text}, req_code)
             post_resp_thread(source, resp)
             # its important to return here
@@ -546,7 +557,7 @@ def dispatch_delete(source,req_code,req_type,data):
         else:
             # if type == eventual respond to source
             if node.get_rep_type() == "eventual":
-                resp_text = "Key:" + key + " deleted at node:" + node.ip_port
+                resp_text = text+ " at node:" + node.ip_port
                 resp = make_resp(source, req_type, {'resp_text': resp_text}, req_code)
                 post_resp_thread(source, resp)
             # now forward request to next node
@@ -557,11 +568,11 @@ def dispatch_delete(source,req_code,req_type,data):
         new_req = make_same_req(source, req_type, data, req_code)
         post_req_thread(node.succ_ip_port, new_req)
     else:
-        node.delete(key)
+        text=node.delete(key)
         # if last_node dont forward , also if linear.. respond to source
         if index == node.get_replicas() - 1 or node.succ_ip_port == resp_ip_port:
             if node.get_rep_type() == "linearizability":
-                resp_text = "Key:" + key + " deleted at node:" + node.ip_port
+                resp_text = text+ " at node:" + node.ip_port
                 resp = make_resp(source, req_type, {'resp_text': resp_text}, req_code)
                 post_resp_thread(source, resp)
         else:

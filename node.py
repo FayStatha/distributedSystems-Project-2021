@@ -52,9 +52,9 @@ class node():
         # returns pair inserted or updated if it already existed
         msg=""
         if self.keys_vals[int(repn)].get(key, "None")=="None":
-             msg+=f"pair ({key},{val}) inserted\n"
+             msg+="inserted"
         else:
-             msg+=f"pair ({key},{val}) updated\n"
+             msg+="updated"
         self.keys_vals[int(repn)].update({key: val})
         return msg
 
@@ -75,9 +75,9 @@ class node():
             if x == "None":
                 continue
             else:
-                msg=f"Pair {key}:{x} deleted succesfully!\n"
+                msg="deleted"
                 return msg
-        msg=f"Key:{key} doesn't exist, hence cant be deleted\n"
+        msg="doesn't exist hence cant be deleted"
         return msg
 
     def is_next(self,source_ip_port):

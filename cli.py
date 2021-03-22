@@ -13,18 +13,10 @@ def main():
 def insert(**kwargs):
     """Insert given key-value pair in Chord!"""
 
-    msg = common_functions.checknodes()
-    if msg == "ok" or msg == "not depart":
-
-        key = kwargs['key']
-        value = kwargs['value']
-        node = kwargs['node']
-
-        common_functions.insert(key, value, node)
-
-    else:
-        print(msg)
-
+    key = kwargs['key']
+    value = kwargs['value']
+    node = kwargs['node']
+    common_functions.insert(key, value, node)
     pass
 
 @main.command()
@@ -33,20 +25,14 @@ def insert(**kwargs):
 def delete(**kwargs):
     """Deletes key-value pair for given key"""
 
-    msg = common_functions.checknodes()
-    if msg == "ok" or msg == "not depart":
-
-        key = kwargs['key']
-
-        if kwargs['node'] != None:
-        	ip = kwargs['node']
-        else:
-        	ip = common_functions.random_select()
-        r = requests.post('http://'+ip+'/delete', data = { 'key':key })
-        print(r.text)
-
+    key = kwargs['key']
+    if kwargs['node'] != None:
+        ip = kwargs['node']
     else:
-        print(msg)
+        ip = common_functions.random_select()
+    r = requests.post('http://'+ip+'/delete', data = { 'key':key })
+    print(r.text)
+
     pass
 
 @main.command()
@@ -55,17 +41,10 @@ def delete(**kwargs):
 def query(**kwargs):
     """Find the key-value pair for given key"""
 
-    msg = common_functions.checknodes()
+    key = kwargs['key']
+    node = kwargs['node']
+    common_functions.query(key, node)
 
-    if msg == "ok" or msg =="not depart":
-
-        key = kwargs['key']
-        node = kwargs['node']
-
-        common_functions.query(key, node)
-
-    else:
-        print(msg)
     pass
 
 @main.command()
@@ -73,15 +52,9 @@ def query(**kwargs):
 def depart(**kwargs):
     """Departs node with given ip from Chord"""
 
-    msg = common_functions.checknodes()
-
-    if msg != "ok":
-        print("No node can depart from Chord, because then not enough nodes for supported replication factor will be online!\n")
-
-    else:
-        ip = kwargs['node']
-        r = requests.post('http://'+ip+"/depart")
-        print(r.text)
+    ip = kwargs['node']
+    r = requests.post('http://'+ip+"/depart")
+    print(r.text)
     pass
 
 @main.command()
@@ -114,68 +87,63 @@ def join(**kwargs):
 def file(**kwargs):
     """Send requests with input from a file"""
 
-    msg = common_functions.checknodes()
+    count = 0
 
-    if msg == "ok" or msg == "not depart":
+    file = kwargs['file_path']
+    file1 = open(file, 'r')
+    Lines = file1.readlines()
 
-        count = 0
+    if kwargs['request_type'] == 'insert':
 
-        file = kwargs['file_path']
-        file1 = open(file, 'r')
-        Lines = file1.readlines()
+        start = time.time()
 
-        if kwargs['request_type'] == 'insert':
-            
-            start = time.time()
+        for line in Lines:
+            count += 1
+            line_list = line.strip().split(',')
+            key = line_list[0]
+            value = line_list[1]
+            common_functions.insert(key, value)
 
-            for line in Lines:
-                count += 1
-                line_list = line.strip().split(',')
-                key = line_list[0]
-                value = line_list[1]
+        end = time.time()
+
+    elif kwargs['request_type'] == 'query':
+
+        start = time.time()
+
+        for line in Lines:
+            count += 1
+            line_list = line.strip().split(',')
+            key = line_list[0]
+            common_functions.query(key)
+
+        end = time.time()
+
+    elif kwargs['request_type'] == 'mix':
+
+        start = time.time()
+
+        for line in Lines:
+            count += 1
+            line_list = line.strip().split(',')
+            req_type = line_list[0]
+            key = line_list[1]
+
+            if req_type == 'insert':
+
+                value = line_list[2]
                 common_functions.insert(key, value)
 
-            end = time.time()
+            elif req_type == 'query':
 
-        elif kwargs['request_type'] == 'query':
-            
-            start = time.time()
-
-            for line in Lines:
-                count += 1
-                line_list = line.strip().split(',')
-                key = line_list[0]
                 common_functions.query(key)
 
             end = time.time()
 
-        elif kwargs['request_type'] == 'mix':
+    throughput = count/(end-start)
 
-            start = time.time()
+    print("Throuput of Chord = %.4f requests/second"%throughput, "%.4f seconds per query"%(1/throughput))
 
-            for line in Lines:
-                count += 1
-                line_list = line.strip().split(',')
-                req_type = line_list[0]
-                key = line_list[1]
 
-                if req_type == 'insert':
-
-                    value = line_list[2]
-                    common_functions.insert(key, value)
-
-                elif req_type == 'query':
-
-                    common_functions.query(key)
-
-                end = time.time()
-
-        throughput = count/(end-start)
-
-        print("Throuput of Chord = %.4f requests/second"%throughput, "%.4f seconds per query"%(1/throughput))
-
-    else:
-        print(msg)
 
 if __name__ == '__main__':
     args = sys.argv
