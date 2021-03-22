@@ -1,5 +1,16 @@
 import requests, random, sys, click, time
 import common_functions
+from threading import Thread
+
+boot_ip='127.0.0.1:5001'
+
+def exec_requests(requests):
+    for r in requests:
+        if r[0]=='insert':
+            common_functions.insert(r[1],r[2],r[3])
+        elif r[0]=='query':
+            common_functions.query(r[1],r[2])
+    return
 
 @click.group()
 def main():
@@ -141,6 +152,71 @@ def file(**kwargs):
 
     throughput = count/(end-start)
 
+    print("Throuput of Chord = %.4f requests/second"%throughput, "%.4f seconds per query"%(1/throughput))
+
+
+
+@main.command()
+@click.argument('file_path', required = True)
+@click.option('--request_type', type = click.Choice(['insert', 'query', 'mix'], case_sensitive = False))
+def file_parallel(**kwargs):
+    """Send requests with input from a file using one thread for each node"""
+
+    #get topology ip's
+    r = requests.post('http://' + boot_ip + '/overlay')
+    nodes_list = r.json()['topology']
+    ip_list = []
+    for node in nodes_list:
+        temp_ip = (node['node_ip_port'])
+        ip_list.append(temp_ip)
+    #create requests dicts
+    requests_dicts={}
+    threads_list=[]
+    for ip in ip_list:
+        requests_dicts[ip]=[]
+
+    count = 0
+    file = kwargs['file_path']
+    file1 = open(file, 'r')
+    Lines = file1.readlines()
+
+    if kwargs['request_type'] == 'insert':
+        for line in Lines:
+            count += 1
+            line_list = line.strip().split(',')
+            key = line_list[0]
+            value = line_list[1]
+            random_ip=random.choice(ip_list)
+            requests_dicts[random_ip].append( ('insert',key,value,random_ip) )
+    elif kwargs['request_type'] == 'query':
+        for line in Lines:
+            count += 1
+            line_list = line.strip().split(',')
+            key = line_list[0]
+            random_ip = random.choice(ip_list)
+            requests_dicts[random_ip].append(('query',key, random_ip))
+    elif kwargs['request_type'] == 'mix':
+        for line in Lines:
+            count += 1
+            line_list = line.strip().split(',')
+            req_type = line_list[0]
+            key = line_list[1]
+            random_ip = random.choice(ip_list)
+            if req_type == 'insert':
+                value = line_list[2]
+                requests_dicts[random_ip].append(('insert',key,value, random_ip))
+            elif req_type == 'query':
+                requests_dicts[random_ip].append(('query', key, random_ip))
+
+    start = time.time()
+    for ip in ip_list:
+        thread = Thread(target=exec_requests, kwargs={'requests': requests_dicts[ip]})
+        threads_list.append(thread)
+        thread.start()
+    for t in threads_list:
+        t.join()
+    end = time.time()
+    throughput = count/(end-start)
     print("Throuput of Chord = %.4f requests/second"%throughput, "%.4f seconds per query"%(1/throughput))
 
 
