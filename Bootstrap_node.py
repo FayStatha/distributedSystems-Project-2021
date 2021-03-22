@@ -1,5 +1,6 @@
 import time
 
+import flask
 from flask import Flask, render_template, request, redirect, url_for
 import sys
 import requests
@@ -86,18 +87,18 @@ def handle_response(resp):
             msg = data['resp_text']
         elif resp_type == 'overlay':
             topology = data['topology']
-            msg = "This is the Chord topology:\n" + str(topology)+"\n"
+            msg = topology
         elif resp_type == 'query_all':
             pairs = data['key-value pairs']
-            msg = "Those are all key-value pairs in Chord:\n" + str(pairs)+"\n"
-            
+            msg = pairs
+
     return msg
 
 
 @app.route('/', methods=['POST', 'GET'])
 def func1():
     if request.method == 'GET':
-        return "Hello Normal node guest"        
+        return "Hello Normal node guest"
     if request.method == 'POST':
         req_dict = request.form
         resp_text = f"Key={req_dict['key']}, Value={req_dict['value']}\n"
@@ -140,7 +141,7 @@ def query():
 
 
         if request_dict['key'] != '*':
-            
+
             key=hash(request_dict['key'])
             data = {'key': key, 'value': "None", "resp_ip_port": "None", 'index': 0}
             req=make_req('query',data,req_code)
@@ -149,12 +150,14 @@ def query():
             data={'key-value pairs':[]}
             req = make_req('query_all', data, req_code)
             post_req_thread(node.succ_ip_port, req)
-            
+
         while responses_dict.get(req_code,"None")=="None":
             {}
 #       pop response from dict and handle it
-        resp=responses_dict.pop(req_code)
-        return handle_response(resp)
+        resp = responses_dict.pop(req_code)
+        msg = handle_response(resp)
+        response = flask.jsonify(result=msg)
+        return response
 
 @app.route('/delete', methods=['POST'])
 def delete():
@@ -196,7 +199,12 @@ def overlay():
             {}
         #       pop response from dict and handle it
         resp = responses_dict.pop(req_code)
-        return handle_response(resp)
+
+        msg=(handle_response(resp))
+        response = flask.jsonify(topology=msg)
+        response.headers.add('Access-Control-Allow-Origin', '*')
+
+        return response
 
 @app.route('/join', methods=['POST'])
 def call_join():
@@ -206,7 +214,11 @@ def call_join():
 @app.route('/show_info', methods=['POST'])
 def show_info():
     print('bootstrap show info')
-    return ("Number of Nodes in CHORD:"+str(number_of_nodes)+"\n"+node.return_node_stats())
+    x="Number of Nodes in CHORD:"+str(number_of_nodes)+"\n"+node.return_node_stats()
+    response = flask.jsonify(x)
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
+
 
 def join():
     global seqn
@@ -595,6 +607,7 @@ if __name__ == '__main__':
     # IT WORKED!!!
     # thread = Thread(target=join)
     # thread.start()
+
     join()
     app.run(host=host, port=port, debug=True)
 

@@ -1,5 +1,6 @@
 import time
 
+import flask
 from flask import Flask, render_template, request, redirect, url_for
 import sys
 import requests
@@ -86,11 +87,10 @@ def handle_response(resp):
             msg=data['resp_text']
         elif resp_type == 'overlay':
             topology = data['topology']
-            msg = "This is the Chord topology:\n" + str(topology)+"\n"
+            msg = topology
         elif resp_type == 'query_all':
             pairs = data['key-value pairs']
-            msg = "Those are all key-value pairs in Chord:\n" + str(pairs)+"\n"
-
+            msg =pairs
     return msg
 
 @app.route('/', methods=['POST', 'GET'])
@@ -153,7 +153,9 @@ def query():
             {}
         #       pop response from dict and handle it
         resp = responses_dict.pop(req_code)
-        return handle_response(resp)
+        msg=handle_response(resp)
+        response = flask.jsonify(result=msg)
+        return response
 
 @app.route('/delete', methods=['POST'])
 def delete():
@@ -235,7 +237,11 @@ def overlay():
             {}
         #       pop response from dict and handle it
         resp = responses_dict.pop(req_code)
-        return handle_response(resp)
+        msg = (handle_response(resp))
+        response = flask.jsonify(topology=msg)
+        response.headers.add('Access-Control-Allow-Origin', '*')
+
+        return response
 
 @app.route('/join',methods=['POST'])
 def call_join():
@@ -248,7 +254,10 @@ def call_join():
 
 @app.route('/show_info', methods=['POST'])
 def show_info():
-    return node.return_node_stats() 
+    x = "\n" + node.return_node_stats()
+    response = flask.jsonify(x)
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
 
 def join():
     # its important to stall join request so that our server has started properly and then we can get the boot server response
@@ -493,6 +502,7 @@ def dispatch_insert(source,req_code,req_type,data):
         else:
             #if type == eventual respond to source
             if node.get_rep_type() == "eventual":
+                debug("INSERT---> EVENTUAL IF")
                 resp_text = "Pair:(" + key + "," + value + ") inserted at node:" + node.ip_port
                 resp = make_resp(source, req_type, {'resp_text': resp_text}, req_code)
                 post_resp_thread(source, resp)

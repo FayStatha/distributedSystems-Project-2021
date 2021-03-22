@@ -130,20 +130,24 @@ class node():
     def pushdown(self,index):
         #pushdown all dicts of keys   index-1-->index , index-->index+1 ,...  , k-2-->k-1
         # index values >0  and <k
+        index=int(index)
+        k=self.get_replicas()
         if (index<=0 or index>=k):
-            return 
+            return
         else:
             temp=self.keys_vals[index-1]
-            for i in range(index,self.replicas):
+            for i in range(index,k):
                 temp2=self.keys_vals[i]
                 self.keys_vals[i]=temp
                 temp=temp2
             return
 
     def pushup(self,index):
-        if index>=self.replicas-1 or index<0:
+        index=int(index)
+        k = self.get_replicas()
+        if index>=k-1 or index<0:
             return
-        for i in range(index+1,self.replicas):
+        for i in range(index+1,k):
             self.keys_vals[i-1]=self.keys_vals[i]
         return
 
@@ -178,5 +182,5 @@ class node():
                 l.append(v)
             hashtable+=str(l)+"\n"
 
-        msg=f"\nIP:{self.ip_port}\n ID:{self.id}\n Prev_IP:{ self.prev_ip_port}\n Next_IP:{ self.succ_ip_port}\n Boot_IP:{self.boot_ip_port}\n Hashtable:\n"+hashtable+"\n"
+        msg=f"\nIP:{self.ip_port}\n  Prev_IP:{ self.prev_ip_port}\n Next_IP:{ self.succ_ip_port}\n Boot_IP:{self.boot_ip_port}\n Hashtable:\n"+hashtable+"\n"
         return msg
