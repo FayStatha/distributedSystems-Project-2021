@@ -50,7 +50,7 @@ def make_same_req(source, req_type, data, req_code):
 def post_req_to(ip_port, req):
     url = "http://" + ip_port + "/ntwreq"
     # debugging
-    debug("I LL POST THIS NTW REQUEST:" + json.dumps(req))
+    #debug("I LL POST THIS NTW REQUEST:" + json.dumps(req))
     requests.post(url, json=req)
 
 def post_req_thread(ip_port, req):
@@ -60,7 +60,7 @@ def post_req_thread(ip_port, req):
 def post_resp_to(ip_port, resp):
     url = "http://" + ip_port + "/ntwresp"
     # debugging
-    debug("I LL POST THIS NTW  RESPONSE:" + json.dumps(resp))
+    #debug("I LL POST THIS NTW  RESPONSE:" + json.dumps(resp))
     requests.post(url, json=resp)
 
 def post_resp_thread(ip_port, resp):
@@ -108,7 +108,7 @@ def func1():
     if request.method == 'POST':
         req_dict = request.form
         resp_text = f"Key={req_dict['key']}, Value={req_dict['value']}\n"
-        print(resp_text)
+        #print(resp_text)
         return resp_text
 
 @app.route('/insert', methods=['POST'])
