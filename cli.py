@@ -1,30 +1,5 @@
-import requests, random, re, sys, click, time
-
-# random select, selects randomly an online node to send the request
-# all our nodes have ips: serverX:port
-
-def random_select():
-	r = requests.post('http://server1:5000/overlay')
-	data = '['+r.text.split('[')[1]
-	my_list = re.findall("server.{6}", data)
-
-	return random.choice(my_list)
-
-def my_insert(key, value, node = None):
-    if node != None:
-    	ip = node
-    else:
-    	ip = random_select()
-    r = requests.post('http://'+ip+'/insert', data = { 'key':key, 'value':value })
-    print(r.text)	
-
-def my_query(key, node = None):
-    if node != None:
-    	ip = node
-    else:
-    	ip = random_select()
-    r = requests.post('http://'+ip+'/query', data = { 'key':key })
-    print(r.text)		
+import requests, random, sys, click, time
+import common_functions
 
 @click.group()
 def main():
@@ -37,11 +12,18 @@ def main():
 @click.argument('node', required = False)
 def insert(**kwargs):
     """Insert given key-value pair in Chord!"""
-    key = kwargs['key']
-    value = kwargs['value']
-    node = kwargs['node']
 
-    my_insert(key, value, node)
+    msg = common_functions.checknodes()
+    if msg == "ok" or msg == "not depart":
+
+        key = kwargs['key']
+        value = kwargs['value']
+        node = kwargs['node']
+
+        common_functions.insert(key, value, node)
+
+    else:
+        print(msg)
 
     pass
 
@@ -50,14 +32,21 @@ def insert(**kwargs):
 @click.argument('node', required = False)
 def delete(**kwargs):
     """Deletes key-value pair for given key"""
-    key = kwargs['key']
 
-    if kwargs['node'] != None:
-    	ip = kwargs['node']
+    msg = common_functions.checknodes()
+    if msg == "ok" or msg == "not depart":
+
+        key = kwargs['key']
+
+        if kwargs['node'] != None:
+        	ip = kwargs['node']
+        else:
+        	ip = common_functions.random_select()
+        r = requests.post('http://'+ip+'/delete', data = { 'key':key })
+        print(r.text)
+
     else:
-    	ip = random_select()
-    r = requests.post('http://'+ip+'/delete', data = { 'key':key })
-    print(r.text)
+        print(msg)
     pass
 
 @main.command()
@@ -65,27 +54,49 @@ def delete(**kwargs):
 @click.argument('node', required = False)
 def query(**kwargs):
     """Find the key-value pair for given key"""
-    key = kwargs['key']
-    node = kwargs['node']
 
-    my_query(key, node)
-    '''
-    if kwargs['node'] != None:
-    	ip = kwargs['node']
+    msg = common_functions.checknodes()
+
+    if msg == "ok" or msg =="not depart":
+
+        key = kwargs['key']
+        node = kwargs['node']
+
+        common_functions.query(key, node)
+
     else:
-    	ip = random_select()
-    r = requests.post('http://'+ip+'/query', data = { 'key':key })
-    print(r.text)
-	'''
+        print(msg)
     pass
 
 @main.command()
 @click.argument('node', required = True)
 def depart(**kwargs):
     """Departs node with given ip from Chord"""
-    ip = kwargs['node']
-    r = requests.post('http://'+ip+"/depart")
-    print(r.text)
+
+    msg = common_functions.checknodes()
+
+    if msg != "ok":
+        print("No node can depart from Chord, because then not enough nodes for supported replication factor will be online!\n")
+
+    else:
+        ip = kwargs['node']
+        r = requests.post('http://'+ip+"/depart")
+        print(r.text)
+    pass
+
+@main.command()
+@click.argument('node', required = False)
+def overlay(**kwargs):
+    """Returns Chord topology"""
+
+    if kwargs['node'] != None:
+    	ip = kwargs['node']
+    else:
+    	ip = common_functions.random_select()
+
+    r = requests.post('http://'+ip+'/overlay')
+    print("This is the Chord topology: \n"+r.text)
+
     pass
 
 @main.command()
@@ -98,86 +109,77 @@ def join(**kwargs):
     pass
 
 @main.command()
-@click.argument('node', required = False)
-def overlay(**kwargs):
-    """Returns Chord topology"""
-
-    if kwargs['node'] != None:
-    	ip = kwargs['node']
-    else:
-    	ip = random_select()
-    r = requests.post('http://'+ip+'/overlay')
-    print(r.text)
-
-    pass
-
-@main.command()
 @click.argument('file_path', required = True)
-@click.option('--request_type',
-              type=click.Choice(['insert', 'query', 'mix'], case_sensitive=False))
+@click.option('--request_type', type = click.Choice(['insert', 'query', 'mix'], case_sensitive = False))
 def file(**kwargs):
-	"""Send requests with input from a file"""
+    """Send requests with input from a file"""
 
-	count = 0
+    msg = common_functions.checknodes()
 
-	file = kwargs['file_path']
-	file1 = open(file, 'r')
-	Lines = file1.readlines()
+    if msg == "ok" or msg == "not depart":
 
-	if kwargs['request_type'] == 'insert':
-		
-		start = time.time()
+        count = 0
 
-		for line in Lines:
-			count += 1
-			line_list = line.strip().split(',')
-			key = line_list[0]
-			value = line_list[1]
-			my_insert(key, value)
+        file = kwargs['file_path']
+        file1 = open(file, 'r')
+        Lines = file1.readlines()
 
-		end = time.time()
+        if kwargs['request_type'] == 'insert':
+            
+            start = time.time()
 
-	elif kwargs['request_type'] == 'query':
-		
-		start = time.time()
+            for line in Lines:
+                count += 1
+                line_list = line.strip().split(',')
+                key = line_list[0]
+                value = line_list[1]
+                common_functions.insert(key, value)
 
-		for line in Lines:
-			count += 1
-			line_list = line.strip().split(',')
-			key = line_list[0]
-			my_query(key)
+            end = time.time()
 
-		end = time.time()
+        elif kwargs['request_type'] == 'query':
+            
+            start = time.time()
 
-	elif kwargs['request_type'] == 'mix':
+            for line in Lines:
+                count += 1
+                line_list = line.strip().split(',')
+                key = line_list[0]
+                common_functions.query(key)
 
-		start = time.time()
+            end = time.time()
 
-		for line in Lines:
-			count += 1
-			line_list = line.strip().split(',')
-			req_type = line_list[0]
-			key = line_list[1]
+        elif kwargs['request_type'] == 'mix':
 
-			if req_type == 'insert':
+            start = time.time()
 
-				value = line_list[2]
-				my_insert(key, value)
+            for line in Lines:
+                count += 1
+                line_list = line.strip().split(',')
+                req_type = line_list[0]
+                key = line_list[1]
 
-			elif req_type == 'query':
+                if req_type == 'insert':
 
-				my_query(key)
+                    value = line_list[2]
+                    common_functions.insert(key, value)
 
-			end = time.time()
+                elif req_type == 'query':
 
-	throughput = count/(end-start)
+                    common_functions.query(key)
 
-	print("Throuput of Chord = %.4f requests/second"%throughput)
+                end = time.time()
 
+        throughput = count/(end-start)
 
+        print("Throuput of Chord = %.4f requests/second"%throughput, "%.4f seconds per query"%(1/throughput))
+
+    else:
+        print(msg)
 
 if __name__ == '__main__':
     args = sys.argv
     if "--help" in args or len(args) == 1:
         print("You need to provide a command!")
     main()
+
