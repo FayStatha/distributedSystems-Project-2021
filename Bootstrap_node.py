@@ -149,7 +149,7 @@ def query():
         if request_dict['key'] != '*':
 
             key=hash(request_dict['key'])
-            data = {'key': key, 'value': "None", "resp_ip_port": "None", 'index': 0}
+            data = {'key': key, 'value': "None", "resp_ip_port": "None", 'index': 0, 'failed_to_find':[False]}
             req=make_req('query',data,req_code)
             post_req_thread(node.ip_port, req)
         else:
@@ -369,6 +369,9 @@ def dispatch_query(source,req_code,req_type,data):
     value=data['value']
     resp_ip_port=data['resp_ip_port']
     index=data['index']
+    # for eventual consistency, if not found once we dont search for key again until it reaches resp, there is no point
+    # make this an array of one element so i can change it later
+    failed_to_find = data['failed_to_find']
     k=node.get_replicas()
     if is_responsible(key):
         resp_ip_port=node.ip_port
@@ -381,7 +384,7 @@ def dispatch_query(source,req_code,req_type,data):
                 return
         #if node isnt last forward request
         if index!=k-1 and node.succ_ip_port!=resp_ip_port:
-            req=make_same_req(source,req_type,{'key':key, 'value':value, 'resp_ip_port':resp_ip_port, 'index':index+1},req_code)
+            req=make_same_req(source,req_type,{'key':key, 'value':value, 'resp_ip_port':resp_ip_port, 'index':index+1, 'failed_to_find':failed_to_find},req_code)
             post_req_thread(node.succ_ip_port,req)
         else:
         #is last node respond to source
@@ -396,13 +399,17 @@ def dispatch_query(source,req_code,req_type,data):
         if index==0:
             #hasnt reached resposible yet
             if node.get_rep_type()=="eventual":
-                value=node.query(key)
-                if (value!="None"):
-                    resp_text = "has value:" + value + " found at node:" + node.ip_port
-                    resp = make_resp(source, req_type, {'resp_text': resp_text}, req_code)
-                    post_resp_thread(source, resp)
-                    return
-            req = make_same_req(source, req_type,{'key': key, 'value': value, 'resp_ip_port': resp_ip_port, 'index': index }, req_code)
+                if not failed_to_find[0]:
+                    # this query should be executed only once!
+                    value=node.query(key)
+                    if (value!="None"):
+                        resp_text = "has value:" + value + " found at node:" + node.ip_port
+                        resp = make_resp(source, req_type, {'resp_text': resp_text}, req_code)
+                        post_resp_thread(source, resp)
+                        return
+                    else:
+                        failed_to_find[0]=True
+            req = make_same_req(source, req_type,{'key': key, 'value': value, 'resp_ip_port': resp_ip_port, 'index': index, 'failed_to_find':failed_to_find }, req_code)
             post_req_thread(node.succ_ip_port, req)
         else:
             #it has reached responsible
@@ -416,7 +423,7 @@ def dispatch_query(source,req_code,req_type,data):
                     return
             if index!=k-1 and node.succ_ip_port!=resp_ip_port:
                 #its not last node-->forward request
-                req = make_same_req(source, req_type,{'key': key, 'value': value, 'resp_ip_port': resp_ip_port, 'index': index+1},req_code)
+                req = make_same_req(source, req_type,{'key': key, 'value': value, 'resp_ip_port': resp_ip_port, 'index': index+1, 'failed_to_find':failed_to_find},req_code)
                 post_req_thread(node.succ_ip_port, req)
             else:
                 #its last node respond to source

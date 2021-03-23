@@ -147,8 +147,7 @@ def file(**kwargs):
             elif req_type == 'query':
 
                 common_functions.query(key)
-
-            end = time.time()
+        end = time.time()
 
     throughput = count/(end-start)
 
