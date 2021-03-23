@@ -2,15 +2,7 @@ import requests, random, sys, click, time
 import common_functions
 from threading import Thread
 
-boot_ip='127.0.0.1:5001'
-
-def exec_requests(requests):
-    for r in requests:
-        if r[0]=='insert':
-            common_functions.insert(r[1],r[2],r[3])
-        elif r[0]=='query':
-            common_functions.query(r[1],r[2])
-    return
+boot_ip='127.0.0.1:5000'
 
 @click.group()
 def main():
@@ -158,7 +150,7 @@ def file(**kwargs):
 @main.command()
 @click.argument('file_path', required = True)
 @click.option('--request_type', type = click.Choice(['insert', 'query', 'mix'], case_sensitive = False))
-def file_parallel(**kwargs):
+def fileparallel(**kwargs):
     """Send requests with input from a file using one thread for each node"""
 
     #get topology ip's
@@ -209,7 +201,7 @@ def file_parallel(**kwargs):
 
     start = time.time()
     for ip in ip_list:
-        thread = Thread(target=exec_requests, kwargs={'requests': requests_dicts[ip]})
+        thread = Thread(target=common_functions.exec_requests, kwargs={'requests': requests_dicts[ip]})
         threads_list.append(thread)
         thread.start()
     for t in threads_list:

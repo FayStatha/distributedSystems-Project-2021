@@ -2,7 +2,15 @@ import requests, random
 
 # random select, selects randomly an online node to send the request
 # set the ip to the Bootstrap's ip
-boot_ip='127.0.0.1:5001'
+boot_ip='127.0.0.1:5000'
+
+def exec_requests(requests):
+    for r in requests:
+        if r[0]=='insert':
+            insert(r[1],r[2],r[3])
+        elif r[0]=='query':
+           query(r[1],r[2])
+    return
 
 def random_select():
     r = requests.post('http://'+boot_ip+'/overlay')
@@ -37,6 +45,3 @@ def query(key, node = None):
     else:
         print(r.json()['result'])
 
-def checknodes():
-    r = requests.post('http://'+boot_ip+'/checknodes')
-    return r.text
