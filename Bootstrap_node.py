@@ -8,10 +8,6 @@ import json
 from node import node
 from threading import Thread
 import hashlib
-from colorama import Fore, Style
-
-# TODO
-# 3)make request/response logs
 
 app = Flask(__name__)
 ip_port = sys.argv[1]
