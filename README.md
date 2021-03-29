@@ -82,7 +82,7 @@ Will fire up a normal node in host server2 port 5000, that communicates with boo
 
 This will provide a description of all supported commands by our cli.
 
-Note: It is important to change the ip in common_function.py to Bootstrap ip:port!
+Note: It is important to change the bootstrap ip in common_function.py and cli.py to bootstrap_ip:port of your system!
 
 ## Techonologies used
 
